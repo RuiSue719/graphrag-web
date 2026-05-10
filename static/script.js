@@ -129,6 +129,16 @@ const decisionModuleMeta = document.getElementById("decisionModuleMeta");
 const decisionMessage = document.getElementById("decisionMessage");
 const decisionTableWrap = document.getElementById("decisionTableWrap");
 const decisionPagination = document.getElementById("decisionPagination");
+const decisionEditModal = document.getElementById("decisionEditModal");
+const decisionModalTitle = document.getElementById("decisionModalTitle");
+const decisionModalCloseBtn = document.getElementById("decisionModalCloseBtn");
+const decisionFaultNameInput = document.getElementById("decisionFaultNameInput");
+const decisionConfidenceEditInput = document.getElementById("decisionConfidenceEditInput");
+const decisionMechanismInput = document.getElementById("decisionMechanismInput");
+const decisionSuggestionsInput = document.getElementById("decisionSuggestionsInput");
+const decisionConsequenceInput = document.getElementById("decisionConsequenceInput");
+const decisionModalSaveBtn = document.getElementById("decisionModalSaveBtn");
+const decisionModalMessage = document.getElementById("decisionModalMessage");
 
 let selectedImage = null;
 let recognition = null;
@@ -185,6 +195,10 @@ const decisionState = {
   total: 0,
   pages: 1,
   keyword: "",
+};
+const decisionModalState = {
+  mode: "detail",
+  editId: 0,
 };
 let DIAG_MODEL_TIPS = {
   cnn: "专为一维时序振动信号设计，通过浅层卷积快速提取局部时域特征，适合数据量中等、追求轻量化快速推理的轴承故障诊断。",
@@ -933,6 +947,11 @@ function setDecisionMessage(text = "") {
   }
 }
 
+function truncateText(text, limit = 10) {
+  const s = String(text || "");
+  return s.length > limit ? `${s.slice(0, limit)}...` : s;
+}
+
 async function loadDecisionModule() {
   if (!decisionTableWrap || !decisionPagination) {
     return;
@@ -979,12 +998,12 @@ function renderDecisionTable(rows) {
         .map(
           (row) => `
       <tr>
-        <td>${escapeHtml(row["故障名称"] || "")}</td>
-        <td>${escapeHtml(row["机理"] || "")}</td>
-        <td>${escapeHtml(row["建议"] || "")}</td>
-        <td>${escapeHtml(row["不维修可能后果"] || "")}</td>
+        <td title="${escapeHtml(row["故障名称"] || "")}">${escapeHtml(truncateText(row["故障名称"] || "", 10))}</td>
+        <td title="${escapeHtml(row["机理"] || "")}">${escapeHtml(truncateText(row["机理"] || "", 10))}</td>
+        <td title="${escapeHtml(row["建议"] || "")}">${escapeHtml(truncateText(row["建议"] || "", 10))}</td>
+        <td title="${escapeHtml(row["不维修可能后果"] || "")}">${escapeHtml(truncateText(row["不维修可能后果"] || "", 10))}</td>
         <td>
-          <button class="case-op-btn" data-op="detail" data-id="${Number(row.id || 0)}">详情</button>
+          <button class="case-op-btn" data-op="detail" data-id="${Number(row.id || 0)}">查看详情</button>
           <button class="case-op-btn" data-op="edit" data-id="${Number(row.id || 0)}">编辑</button>
           <button class="case-op-btn danger" data-op="delete" data-id="${Number(row.id || 0)}">删除</button>
           <button class="case-op-btn" data-op="download" data-id="${Number(row.id || 0)}">下载MD</button>
@@ -1005,7 +1024,7 @@ function renderDecisionTable(rows) {
         return;
       }
       if (op === "detail") {
-        await showDecisionDetail(recordId);
+        await openDecisionModal("detail", recordId);
         return;
       }
       if (op === "delete") {
@@ -1022,7 +1041,7 @@ function renderDecisionTable(rows) {
         return;
       }
       if (op === "edit") {
-        await editDecisionRecord(recordId);
+        await openDecisionModal("edit", recordId);
       }
     });
   });
@@ -1049,59 +1068,85 @@ function renderDecisionPagination() {
   });
 }
 
-async function showDecisionDetail(recordId) {
-  try {
-    const res = await fetch(`/api/intelligent-decisions/${recordId}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "读取详情失败");
-    const row = data.record || {};
-    const text =
-      `故障名称：${row["故障名称"] || ""}\n` +
-      `风险程度：${row.riskLevel || ""}\n` +
-      `置信度：${row.confidence ?? 0}%\n` +
-      `机理：${row["机理"] || ""}\n\n` +
-      `建议：\n${row["建议"] || ""}\n\n` +
-      `不维修可能后果：\n${row["不维修可能后果"] || ""}`;
-    window.alert(text);
-  } catch (e) {
-    setDecisionMessage(e.message || "读取详情失败");
+function setDecisionModalEditable(editable) {
+  [decisionFaultNameInput, decisionConfidenceEditInput, decisionMechanismInput, decisionSuggestionsInput, decisionConsequenceInput].forEach(
+    (el) => {
+      if (!el) return;
+      el.readOnly = !editable;
+      if (el.type === "number") {
+        el.disabled = !editable;
+      }
+    }
+  );
+  if (decisionModalSaveBtn) {
+    decisionModalSaveBtn.style.display = editable ? "inline-flex" : "none";
   }
 }
 
-async function editDecisionRecord(recordId) {
+function setDecisionModalMessage(text = "") {
+  if (decisionModalMessage) {
+    decisionModalMessage.textContent = text;
+  }
+}
+
+function closeDecisionModal() {
+  decisionEditModal?.classList.add("hidden");
+  decisionModalState.editId = 0;
+  decisionModalState.mode = "detail";
+  setDecisionModalMessage("");
+}
+
+async function openDecisionModal(mode, recordId) {
   try {
     const res = await fetch(`/api/intelligent-decisions/${recordId}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "读取记录失败");
     const row = data.record || {};
-    const faultName = window.prompt("故障名称", row["故障名称"] || "");
-    if (faultName === null) return;
-    const mechanism = window.prompt("机理", row["机理"] || "");
-    if (mechanism === null) return;
-    const suggestions = window.prompt("建议", row["建议"] || "");
-    if (suggestions === null) return;
-    const consequence = window.prompt("不维修可能后果", row["不维修可能后果"] || "");
-    if (consequence === null) return;
-    const confidenceRaw = window.prompt("置信度（0-100）", String(row.confidence ?? 0));
-    if (confidenceRaw === null) return;
-    const confidence = Number(confidenceRaw || 0);
-    const updateRes = await fetch(`/api/intelligent-decisions/${recordId}`, {
+    decisionModalState.mode = mode === "edit" ? "edit" : "detail";
+    decisionModalState.editId = Number(recordId || 0);
+    if (decisionModalTitle) {
+      decisionModalTitle.textContent = decisionModalState.mode === "edit" ? "编辑智能决策" : "智能决策详情";
+    }
+    if (decisionFaultNameInput) decisionFaultNameInput.value = row["故障名称"] || "";
+    if (decisionConfidenceEditInput) decisionConfidenceEditInput.value = String(row.confidence ?? 0);
+    if (decisionMechanismInput) decisionMechanismInput.value = row["机理"] || "";
+    if (decisionSuggestionsInput) decisionSuggestionsInput.value = row["建议"] || "";
+    if (decisionConsequenceInput) decisionConsequenceInput.value = row["不维修可能后果"] || "";
+    setDecisionModalEditable(decisionModalState.mode === "edit");
+    setDecisionModalMessage(
+      decisionModalState.mode === "edit" ? "可编辑并保存全部字段。" : `风险程度：${row.riskLevel || "-"}`
+    );
+    decisionEditModal?.classList.remove("hidden");
+  } catch (e) {
+    setDecisionMessage(e.message || "读取记录失败");
+  }
+}
+
+async function saveDecisionModal() {
+  if (decisionModalState.mode !== "edit" || !decisionModalState.editId) {
+    return;
+  }
+  setDecisionModalMessage("");
+  const confidence = Number(decisionConfidenceEditInput?.value || 0);
+  try {
+    const updateRes = await fetch(`/api/intelligent-decisions/${decisionModalState.editId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        故障名称: faultName.trim(),
-        机理: mechanism.trim(),
-        建议: suggestions.trim(),
-        不维修可能后果: consequence.trim(),
+        故障名称: (decisionFaultNameInput?.value || "").trim(),
+        机理: (decisionMechanismInput?.value || "").trim(),
+        建议: (decisionSuggestionsInput?.value || "").trim(),
+        不维修可能后果: (decisionConsequenceInput?.value || "").trim(),
         confidence: Number.isFinite(confidence) ? confidence : 0,
       }),
     });
     const updateData = await updateRes.json();
     if (!updateRes.ok) throw new Error(updateData.error || "更新失败");
+    closeDecisionModal();
     await loadDecisionModule();
     setDecisionMessage("记录已更新。");
   } catch (e) {
-    setDecisionMessage(e.message || "更新失败");
+    setDecisionModalMessage(e.message || "更新失败");
   }
 }
 
@@ -1253,32 +1298,6 @@ async function submitCaseModal() {
   }
 }
 
-async function loadAdminKbFileDetail(filename) {
-  if (!kgManageTableWrap || !kgManageDetailTitle || !kgManageDetailBlock || !filename) {
-    return;
-  }
-  kgManageDetailBlock.classList.remove("hidden");
-  kgManageDetailTitle.textContent = `正在读取 ${filename} ...`;
-  kgManageTableWrap.innerHTML = "<div class='admin-empty'>正在读取CSV内容...</div>";
-  try {
-    const res = await fetch(`/api/admin/kb-files/${encodeURIComponent(filename)}`);
-    if (res.status === 401) {
-      window.location.href = "/login";
-      return;
-    }
-    const data = await res.json();
-    if (!res.ok) {
-      kgManageTableWrap.innerHTML = `<div class='admin-empty'>${escapeHtml(data.error || "读取失败")}</div>`;
-      return;
-    }
-    kbManageState.selectedFile = data.file || filename;
-    kgManageDetailTitle.textContent = `${data.file}（${data.category || "other"}，数据行 ${data.rowCount || 0}）`;
-    renderAdminTable(kgManageTableWrap, data.columns || [], data.rows || []);
-  } catch (e) {
-    kgManageTableWrap.innerHTML = "<div class='admin-empty'>CSV内容加载失败。</div>";
-  }
-}
-
 function renderKbCategoryFilter() {
   if (!kgCategoryFilter) return;
   const options = (kbManageState.categoryOptions || [])
@@ -1308,9 +1327,10 @@ function renderKbManageTable(rows) {
     : `<tr><td colspan="7">暂无数据</td></tr>`;
   kgManageListWrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
   kgManageListWrap.querySelectorAll(".case-op-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const f = btn.getAttribute("data-file") || "";
-      await loadAdminKbFileDetail(f);
+      if (!f) return;
+      window.location.href = `/admin/kb-files/view/${encodeURIComponent(f)}`;
     });
   });
 }
@@ -2530,6 +2550,8 @@ decisionSearchInput?.addEventListener("keydown", async (e) => {
     await loadDecisionModule();
   }
 });
+decisionModalCloseBtn?.addEventListener("click", closeDecisionModal);
+decisionModalSaveBtn?.addEventListener("click", saveDecisionModal);
 diagSaveDecisionBtn?.addEventListener("click", saveDiagToDecision);
 
 kgUploadBtn?.addEventListener("click", () => kgUploadInput?.click());

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV 详情 - {{ file }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app-shell" style="padding: 18px; overflow: auto;">
+    <section class="welcome-card">
+      <h1>CSV 详细内容</h1>
+      <p>文件：{{ file }} ｜ 类型：{{ category }} ｜ 数据行：{{ row_count }}</p>
+      <a class="ghost-btn" href="/">返回系统首页</a>
+    </section>
+    <section class="admin-case-card" style="margin-top: 12px;">
+      <div class="admin-table-wrap">
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                {% for c in columns %}
+                <th>{{ c }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% if rows %}
+                {% for row in rows %}
+                <tr>
+                  {% for cell in row %}
+                  <td>{{ cell }}</td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="{{ columns|length if columns else 1 }}">暂无数据</td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

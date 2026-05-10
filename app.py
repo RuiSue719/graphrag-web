@@ -2599,6 +2599,28 @@ def admin_kb_file_detail(filename: str):
     )
 
 
+@app.get("/admin/kb-files/view/<path:filename>")
+def admin_kb_file_view_page(filename: str):
+    if not is_admin_session():
+        return jsonify({"error": "仅管理员可访问"}), 403
+    safe_name = Path(filename).name
+    if not safe_name.lower().endswith(".csv"):
+        return "仅支持查看CSV文件", 400
+    target = CSV_KB_DIR / safe_name
+    if not target.exists() or not target.is_file():
+        return "文件不存在", 404
+
+    parsed = read_csv_rows(target)
+    return render_template(
+        "kb_file_detail.html",
+        file=safe_name,
+        category=_kb_file_category(safe_name),
+        columns=parsed["columns"],
+        rows=parsed["rows"],
+        row_count=len(parsed["rows"]),
+    )
+
+
 @app.post("/api/admin/kb-files/upload")
 def admin_kb_file_upload():
     if not is_admin_session():

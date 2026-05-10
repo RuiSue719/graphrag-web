@@ -1172,6 +1172,7 @@ body {
 
 .profile-form-grid input,
 .case-form-grid input,
+.case-form-grid textarea,
 .case-form-grid select,
 .case-input {
   width: 100%;
@@ -1181,6 +1182,11 @@ body {
   font-size: 13px;
   background: #fbfdff;
   color: #334d79;
+}
+
+.case-form-grid textarea {
+  min-height: 84px;
+  resize: vertical;
 }
 
 .profile-form-grid input[readonly] {
@@ -1213,6 +1219,14 @@ body {
 
 .decision-toolbar {
   grid-template-columns: minmax(220px, 2fr) 140px 120px minmax(220px, 2fr) 68px 68px;
+}
+
+#decisionGenerateBtn {
+  min-width: 0;
+  width: 120px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
 }
 
 #kgManageListWrap {
