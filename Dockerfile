@@ -4,8 +4,10 @@ FROM python:3.12-slim-bullseye
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖（gfortran 确保 scipy 能编译，同时也支持预编译 wheel）
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 替换为阿里云镜像源，并安装 gfortran
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com\/debian-security/g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
     gfortran \
     && rm -rf /var/lib/apt/lists/*
 
