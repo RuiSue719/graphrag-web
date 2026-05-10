@@ -568,8 +568,8 @@ body {
 .home-circle-image::before {
   content: "";
   position: absolute;
-  inset: -12%;
-  background-image: url("/static/assets/pic1.png");
+  inset: -8%;
+  background-image: url("/static/pic2.png");
   background-repeat: no-repeat;
   background-size: contain;
   background-position: center;
@@ -595,7 +595,7 @@ body {
 .home-feature-grid {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1203,15 +1203,31 @@ body {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
   grid-template-areas:
     "fault confidence"
-    "mechanism mechanism"
+    "mechanism risk"
     "consequence suggestions";
+  font-family: "SimHei", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 .decision-form-grid .decision-fault { grid-area: fault; }
 .decision-form-grid .decision-confidence { grid-area: confidence; }
 .decision-form-grid .decision-mechanism { grid-area: mechanism; }
+.decision-form-grid .decision-risk { grid-area: risk; }
 .decision-form-grid .decision-consequence { grid-area: consequence; }
 .decision-form-grid .decision-suggestions { grid-area: suggestions; }
+
+.decision-form-grid label,
+.decision-form-grid input,
+.decision-form-grid textarea {
+  font-family: "SimHei", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+.decision-form-grid .decision-mechanism textarea {
+  min-height: 104px;
+}
+
+.decision-form-grid .decision-risk input {
+  height: 40px;
+}
 
 .decision-form-grid .decision-consequence textarea,
 .decision-form-grid .decision-suggestions textarea {
@@ -2086,7 +2102,7 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   overflow-y: auto;
 }
 
@@ -2140,7 +2156,7 @@ textarea:focus {
 .login-feature-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   width: 100%;
 }
 
@@ -2148,7 +2164,7 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   width: 100%;
 }
 
@@ -2168,14 +2184,14 @@ textarea:focus {
 .login-adv-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .login-adv-card {
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   margin: 0;
   width: 100%;
   line-height: 1.35;

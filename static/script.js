@@ -143,6 +143,7 @@ const decisionModalCloseBtn = document.getElementById("decisionModalCloseBtn");
 const decisionFaultNameInput = document.getElementById("decisionFaultNameInput");
 const decisionConfidenceEditInput = document.getElementById("decisionConfidenceEditInput");
 const decisionMechanismInput = document.getElementById("decisionMechanismInput");
+const decisionRiskLevelInput = document.getElementById("decisionRiskLevelInput");
 const decisionSuggestionsInput = document.getElementById("decisionSuggestionsInput");
 const decisionConsequenceInput = document.getElementById("decisionConsequenceInput");
 const decisionModalSaveBtn = document.getElementById("decisionModalSaveBtn");
@@ -1102,6 +1103,10 @@ function setDecisionModalEditable(editable) {
       }
     }
   );
+  if (decisionRiskLevelInput) {
+    decisionRiskLevelInput.readOnly = true;
+    decisionRiskLevelInput.disabled = false;
+  }
   if (decisionModalSaveBtn) {
     decisionModalSaveBtn.style.display = editable ? "inline-flex" : "none";
   }
@@ -1111,6 +1116,14 @@ function setDecisionModalMessage(text = "") {
   if (decisionModalMessage) {
     decisionModalMessage.textContent = text;
   }
+}
+
+function riskByConfidence(confidence) {
+  const value = Number(confidence);
+  if (!Number.isFinite(value)) return "-";
+  if (value < 50) return "低风险";
+  if (value <= 80) return "中风险";
+  return "高风险";
 }
 
 function closeDecisionModal() {
@@ -1134,6 +1147,7 @@ async function openDecisionModal(mode, recordId) {
     if (decisionFaultNameInput) decisionFaultNameInput.value = row["故障名称"] || "";
     if (decisionConfidenceEditInput) decisionConfidenceEditInput.value = String(row.confidence ?? 0);
     if (decisionMechanismInput) decisionMechanismInput.value = row["机理"] || "";
+    if (decisionRiskLevelInput) decisionRiskLevelInput.value = row.riskLevel || "-";
     if (decisionSuggestionsInput) decisionSuggestionsInput.value = row["建议"] || "";
     if (decisionConsequenceInput) decisionConsequenceInput.value = row["不维修可能后果"] || "";
     setDecisionModalEditable(decisionModalState.mode === "edit");
@@ -2672,6 +2686,10 @@ decisionSearchInput?.addEventListener("keydown", async (e) => {
 });
 decisionModalCloseBtn?.addEventListener("click", closeDecisionModal);
 decisionModalSaveBtn?.addEventListener("click", saveDecisionModal);
+decisionConfidenceEditInput?.addEventListener("input", () => {
+  if (!decisionRiskLevelInput) return;
+  decisionRiskLevelInput.value = riskByConfidence(decisionConfidenceEditInput?.value);
+});
 diagSaveDecisionBtn?.addEventListener("click", saveDiagToDecision);
 
 kgUploadBtn?.addEventListener("click", () => kgUploadInput?.click());

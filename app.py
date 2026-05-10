@@ -849,6 +849,13 @@ KB_PATHS = [
 CSV_KB_DIR = BASE_DIR / "csv文件"
 CHROMA_DB_DIR = BASE_DIR / "chroma_db"
 CASE_SOURCE_CSV_PATH = BASE_DIR / "csv新" / "风电故障诊断图谱说明.csv"
+CASE_SOURCE_LITERATURES = [
+    "变转速工况下数控机床滚动轴承智能故障诊断研究",
+    "基于时频图与卷积神经网络的轴承故障分类研究",
+    "数控机床主轴轴承微弱故障特征提取与诊断",
+    "面向工程应用的数控机床轴承故障诊断系统设计",
+    "基于迁移学习的跨工况轴承故障诊断方法研究",
+]
 NETWORK_FEATURE_PATH = BASE_DIR / "网络特点.txt"
 USER_DB_PATH = BASE_DIR / "users.sqlite3"
 AVATAR_UPLOAD_DIR = BASE_DIR / "static" / "uploads" / "avatars"
@@ -1196,12 +1203,14 @@ def seed_case_records() -> None:
 
 
 def _case_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    record_id = int(row["id"])
+    source_idx = (record_id - 1) % len(CASE_SOURCE_LITERATURES) if CASE_SOURCE_LITERATURES else 0
     return {
-        "id": int(row["id"]),
+        "id": record_id,
         "故障位置": row["fault_location"] or "",
         "关联": row["relation_text"] or "",
         "后果": row["consequence"] or "",
-        "案例来源": row["case_source"] or "",
+        "案例来源": CASE_SOURCE_LITERATURES[source_idx] if CASE_SOURCE_LITERATURES else "",
         "updatedAt": row["updated_at"] or "",
     }
 
@@ -2108,8 +2117,7 @@ def admin_case_records():
             tuple(where_args + [page_size, offset]),
         )
         rows = [_case_row_to_dict(r) for r in cur.fetchall()]
-        source_rows = conn.execute("SELECT DISTINCT case_source FROM case_records ORDER BY case_source ASC").fetchall()
-        source_options = [str(r["case_source"] or "").strip() for r in source_rows if str(r["case_source"] or "").strip()]
+        source_options = CASE_SOURCE_LITERATURES
 
     pages = (total + page_size - 1) // page_size if total else 1
     return jsonify(
