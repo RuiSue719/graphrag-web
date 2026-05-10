@@ -568,10 +568,10 @@ body {
 .home-circle-image::before {
   content: "";
   position: absolute;
-  inset: -8%;
+  inset: 0;
   background-image: url("/static/pic2.png");
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: cover;
   background-position: center;
 }
 

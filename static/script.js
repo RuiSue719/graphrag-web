@@ -164,6 +164,8 @@ let pinnedNodeId = null;
 let graphAutoRetryTimer = null;
 let graphAutoRetryCount = 0;
 let isVoiceListening = false;
+const HISTORY_VISIBLE_MONTH = 5;
+const HISTORY_VISIBLE_DAY = 10;
 const diagState = {
   initialized: false,
   dataset: "",
@@ -1690,7 +1692,8 @@ function loadSessions() {
   if (sessions.length === 0) {
     createNewSession(false);
   } else {
-    currentSessionId = sessions[0].id;
+    const visibleSessions = sessions.filter((s) => isHistorySessionVisible(s));
+    currentSessionId = (visibleSessions[0] && visibleSessions[0].id) || sessions[0].id;
   }
 }
 
@@ -1724,6 +1727,7 @@ function renderHistory() {
   historyList.innerHTML = "";
   sessions
     .sort((a, b) => b.updatedAt - a.updatedAt)
+    .filter((s) => isHistorySessionVisible(s))
     .forEach((s) => {
       const div = document.createElement("div");
       div.className = `history-item ${s.id === currentSessionId ? "active" : ""}`;
@@ -1736,6 +1740,15 @@ function renderHistory() {
       });
       historyList.appendChild(div);
     });
+}
+
+function isHistorySessionVisible(session) {
+  const ts = Number(session?.updatedAt || session?.createdAt || 0);
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return false;
+  }
+  const d = new Date(ts);
+  return d.getMonth() + 1 === HISTORY_VISIBLE_MONTH && d.getDate() === HISTORY_VISIBLE_DAY;
 }
 
 function renderCurrentSession() {
