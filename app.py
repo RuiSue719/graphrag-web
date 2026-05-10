@@ -84,11 +84,11 @@ FAQ_POOL = [
     "如果我想做多模态故障诊断，第一步应该做什么？",
     "振动信号研究可以使用哪些公开数据集？",
     "如何把FAQ和向量检索结合起来提高命中率？",
-    "风电主轴振动过大的常见原因有哪些？",
-    "主轴轴承温度超过80℃应该怎么处理？",
-    "齿轮箱油温超过90℃有哪些危害与处理措施？",
-    "变桨系统无响应时应如何排查？",
-    "偏航制动器失效的危害及处理措施是什么？",
+    "数控机床主轴振动过大的常见原因有哪些？",
+    "主轴轴承温度超过70℃应该怎么处理？",
+    "数控机床加工精度超差的常见原因是什么？",
+    "液压站压力建立不起来应如何排查？",
+    "伺服电机过热报警时应如何处理？",
 ]
 
 GLOSSARY = {
@@ -844,7 +844,7 @@ class CloudLLMService:
 BASE_DIR = Path(__file__).resolve().parent
 KB_PATHS = [
     BASE_DIR / "data" / "knowledge.md",
-    BASE_DIR / "data" / "wind_power_qa.md",
+    BASE_DIR / "data" / "new_qa.md",
 ]
 CSV_KB_DIR = BASE_DIR / "csv文件"
 CHROMA_DB_DIR = BASE_DIR / "chroma_db"
@@ -897,7 +897,7 @@ DIAG_CLASS_NAMES = {
     "MFPT": ["正常", "外圈故障", "内圈故障"],
 }
 DIAG_MODEL_CACHE: Dict[str, Any] = {}
-QA_ONLY_SOURCE = "wind_power_qa"
+QA_ONLY_SOURCE = "new_qa"
 kb = KnowledgeBase(KB_PATHS, csv_dir=CSV_KB_DIR)
 chroma_retriever = ChromaHybridRetriever(kb, CHROMA_DB_DIR)
 neo4j_service = Neo4jService(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, NEO4J_DATABASE)
@@ -2816,7 +2816,7 @@ def chat():
             max_models_to_try=1,
             timeout_seconds_override=60,
         )
-        answer = ensure_complete_sentences(plain_text or "你好，我可以继续为你解答风电设备相关问题。")
+        answer = ensure_complete_sentences(plain_text or "你好，我可以继续为你解答数控机床设备相关问题。")
         return jsonify(
             {
                 "answer": answer,
@@ -2892,9 +2892,9 @@ def chat():
     is_kg_auto_mode = request_mode == "kg-auto"
     is_citation_mode = bool(graph_node) and request_mode != "kg-auto"
     if is_kg_auto_mode:
-        prompt_head = "你是风电设备故障诊断助手。只输出最终结论，不要分析过程。"
+        prompt_head = "你是数控机床故障诊断助手。只输出最终结论，不要分析过程。"
     elif is_citation_mode:
-        prompt_head = "你是风电设备维护助手。必须在100字内给出完整结论，不要输出推理过程。"
+        prompt_head = "你是数控机床维护助手。必须在100字内给出完整结论，不要输出推理过程。"
     else:
         prompt_head = "你是工业设备故障问答助手。优先基于提供的上下文，结论简洁、可执行。"
 

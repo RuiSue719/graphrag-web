@@ -557,11 +557,21 @@ body {
 .home-circle-image {
   width: 240px;
   height: 240px;
+  position: relative;
+  overflow: hidden;
   border-radius: 50%;
   border: 8px solid #fff;
   box-shadow: 0 12px 30px rgba(32, 60, 123, 0.18);
+  background: #ffffff;
+}
+
+.home-circle-image::before {
+  content: "";
+  position: absolute;
+  inset: -12%;
   background-image: url("/static/assets/pic1.png");
-  background-size: cover;
+  background-repeat: no-repeat;
+  background-size: contain;
   background-position: center;
 }
 
@@ -1236,6 +1246,14 @@ body {
   grid-template-columns: 98px 130px minmax(220px, 1fr) 68px 68px;
 }
 
+.kb-detail-toolbar {
+  grid-template-columns: 98px minmax(280px, 1fr) minmax(180px, 1fr) 68px 68px;
+}
+
+.kb-detail-toolbar-spacer {
+  min-height: 1px;
+}
+
 .decision-toolbar {
   grid-template-columns: minmax(220px, 2fr) 140px 120px minmax(220px, 2fr) 68px 68px;
 }
@@ -1261,6 +1279,14 @@ body {
 }
 
 #kgUploadBtn {
+  min-width: 0;
+  width: 98px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+#kbDetailBackBtn {
   min-width: 0;
   width: 98px;
   height: 36px;
@@ -2041,8 +2067,8 @@ textarea:focus {
 
 .login-shell {
   width: min(1360px, 96vw);
-  margin: 2.4vh auto;
-  min-height: 95vh;
+  margin: 8px auto;
+  height: calc(100vh - 16px);
   border: 1px solid var(--line);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.93);
@@ -2055,19 +2081,20 @@ textarea:focus {
 .login-hero {
   position: relative;
   isolation: isolate;
-  padding: 0 45px;
+  padding: 16px 28px;
   color: #fff;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
+  gap: 12px;
+  overflow-y: auto;
 }
 
 .login-hero::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: url("/static/login-bg.jpg");
+  background-image: url("/static/pic2.png");
   background-size: cover;
   background-position: center;
   z-index: -2;
@@ -2085,7 +2112,7 @@ textarea:focus {
   width: 100%;
 }
 .hero-main-title {
-  font-size: 32px !important;
+  font-size: 24px !important;
   font-weight: 700;
   text-align: center;
   margin: 0 0 8px 0 !important;
@@ -2098,22 +2125,22 @@ textarea:focus {
   color: #fff !important;
 }
 .hero-desc {
-  font-size: 18px !important;
+  font-size: 15px !important;
   text-align: center;
   margin: 0 !important;
   color: #eee !important;
 }
 
 .login-section-title {
-  font-size: 18px;
+  font-size: 16px;
   margin: 0;
   color: #fff !important;
 }
 
 .login-feature-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   width: 100%;
 }
 
@@ -2121,40 +2148,43 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 10px 12px;
   width: 100%;
 }
 
 .login-feature-card h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+  margin: 0 0 4px 0;
+  font-size: 14px;
   color: #fff !important;
 }
 
 .login-feature-card p {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.35;
   color: #eee !important;
 }
 
-.login-adv-list {
+.login-adv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.login-adv-card {
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 12px;
-  padding: 18px 20px 18px 40px;
+  padding: 10px 12px;
   margin: 0;
   width: 100%;
-  line-height: 1.8;
-  font-size: 14px;
-}
-
-.login-adv-list li {
-  margin-bottom: 6px;
+  line-height: 1.35;
+  font-size: 12px;
+  color: #eee;
 }
 
 .login-panel {
-  padding: 60px 40px;
+  padding: 40px 34px;
   background: #fff;
   display: flex;
   flex-direction: column;
