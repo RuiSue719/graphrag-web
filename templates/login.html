@@ -14,33 +14,38 @@
   <main class="login-shell">
     <section class="login-hero">
       <div class="hero-title-group">
-        <h1 class="hero-main-title">风诊智答——风电设备故障诊断一体化问答系统</h1>
+        <h1 class="hero-main-title">数智诊维——融合知识图谱与大模型的数控机床故障预测与决策平台</h1>
       </div>
-      <p class="hero-desc">面向风电运维场景的轻量化智能问答解决方案</p>
+      <p class="hero-desc">面向数控机床运维场景的智能故障预测与维护决策解决方案</p>
 
       <h3 class="login-section-title">系统功能模块</h3>
 
       <div class="login-feature-grid">
         <article class="login-feature-card">
           <h3>知识图谱交互</h3>
-          <p>可视化展示设备故障关系网络，支持节点检索与点击联动问答。</p>
+          <p>可视化展示数控机床故障部件、现象、原因、措施的关系网络，支持节点检索与点击联动问答。</p>
         </article>
         <article class="login-feature-card">
           <h3>检索增强问答</h3>
-          <p>融合 Neo4j 图谱三元组与本地运维手册，生成可追溯的故障排查建议。</p>
+          <p>融合Neo4j图谱三元组与本地运维手册，基于GraphRAG架构生成可追溯的故障诊断建议。</p>
         </article>
         <article class="login-feature-card">
           <h3>数据诊断</h3>
-          <p>使用预训练模型完成轴承故障类型推理，实时性强，置信度高。</p>
+          <p>集成CNN、WDCNN、CNN-LSTM、CNN-Transformer四种模型，完成主轴轴承故障类型推理，实时性强，置信度高。</p>
+        </article>
+        <article class="login-feature-card">
+          <h3>预测性维护</h3>
+          <p>基于CNN-LSTM混合模型对轴承性能退化趋势建模，预估剩余使用寿命，自动生成综合维护报告。</p>
         </article>
       </div>
 
       <h3 class="login-section-title">技术优势</h3>
 
       <ul class="login-adv-list">
-        <li>图谱增强：解决纯文本问答的逻辑缺失问题，回答更专业</li>
-        <li>低资源适配：轻量化模型与 CPU 友好设计，降低部署门槛</li>
-        <li>场景化优化：针对风电运维场景定制，输出结构化、可落地的诊断结果</li>
+        <li>图谱增强：以GraphRAG替代纯文本检索，将故障传播路径显式注入推理过程，抑制大模型幻觉，回答更专业、可解释</li>
+        <li>诊断预测闭环：深度学习故障分类与RUL预测相结合，打通“检测—诊断—预测—决策”全链路</li>
+        <li>低资源适配：轻量化模型与CPU友好设计，降低部署门槛，适配中小制造企业实际条件</li>
+        <li>场景化定制：针对数控机床主轴轴承典型故障深度优化，输出结构化、可落地的诊断与维护方案</li>
       </ul>
     </section>
 

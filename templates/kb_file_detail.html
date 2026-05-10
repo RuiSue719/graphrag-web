@@ -3,136 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CSV 详情 - {{ file }}</title>
+  <title>CSV 详情</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-  <style>
-    .kb-detail-wrap { width: min(1520px, 98vw); margin: 18px auto; }
-    .kb-detail-toolbar {
-      display: grid;
-      grid-template-columns: 140px minmax(240px, 1fr) 68px 68px;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-  </style>
 </head>
 <body>
-  <div class="kb-detail-wrap">
+  <div class="app-shell" style="padding:20px;display:block;">
     <section class="welcome-card">
-      <h1>CSV 详细内容</h1>
-      <p>文件：{{ file }} ｜ 类型：{{ category }} ｜ 数据行：{{ row_count }}</p>
-      <a class="ghost-btn" href="/?module=kgManageModule">返回图谱管理</a>
-    </section>
-    <section class="admin-case-card" style="margin-top: 12px;">
-      <div class="kb-detail-toolbar">
-        <a class="rect-primary-btn" href="/?module=kgManageModule" style="width:140px;min-width:0;height:36px;font-size:13px;">返回图谱管理</a>
-        <input id="kbDetailKeyword" class="case-input" type="text" placeholder="检索关键字（匹配任意列）" />
-        <button id="kbDetailSearchBtn" class="ghost-btn" type="button">搜索</button>
-        <button id="kbDetailResetBtn" class="ghost-btn" type="button">重置</button>
-      </div>
-      <div id="kbDetailMeta" class="admin-detail-title"></div>
-      <div class="admin-table-wrap">
-        <div id="kbDetailTableWrap"></div>
-      </div>
-      <div id="kbDetailPagination" class="case-pagination"></div>
+      <h1>CSV 详细内容已迁移</h1>
+      <p>请返回主系统后在左侧功能栏中进入图谱管理，再查看 CSV 详情。</p>
     </section>
   </div>
-
-  <script>
-    const allColumns = {{ columns | tojson }};
-    const allRows = {{ rows | tojson }};
-    const state = { page: 1, pageSize: 10, keyword: "", rows: allRows.slice() };
-
-    function escapeHtml(s) {
-      return String(s || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
-    function applyFilter() {
-      const kw = (state.keyword || "").trim().toLowerCase();
-      if (!kw) {
-        state.rows = allRows.slice();
-      } else {
-        state.rows = allRows.filter((row) =>
-          (row || []).some((cell) => String(cell || "").toLowerCase().includes(kw))
-        );
-      }
-      state.page = 1;
-      render();
-    }
-
-    function renderTable() {
-      const wrap = document.getElementById("kbDetailTableWrap");
-      if (!wrap) return;
-      const offset = (state.page - 1) * state.pageSize;
-      const pageRows = state.rows.slice(offset, offset + state.pageSize);
-      const thead = `<tr>${allColumns.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr>`;
-      const tbody = pageRows.length
-        ? pageRows
-            .map((r) => `<tr>${allColumns.map((_, i) => `<td>${escapeHtml(r[i] ?? "")}</td>`).join("")}</tr>`)
-            .join("")
-        : `<tr><td colspan="${Math.max(allColumns.length, 1)}">暂无数据</td></tr>`;
-      wrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
-    }
-
-    function renderPagination() {
-      const el = document.getElementById("kbDetailPagination");
-      if (!el) return;
-      const pages = Math.max(1, Math.ceil(state.rows.length / state.pageSize));
-      if (state.page > pages) state.page = pages;
-      el.innerHTML = `
-        <span>第 ${state.page} / ${pages} 页</span>
-        <span>每页固定 ${state.pageSize} 条</span>
-        <button class="case-page-btn" id="kbPrevBtn" ${state.page <= 1 ? "disabled" : ""}>上一页</button>
-        <button class="case-page-btn" id="kbNextBtn" ${state.page >= pages ? "disabled" : ""}>下一页</button>
-      `;
-      document.getElementById("kbPrevBtn")?.addEventListener("click", () => {
-        if (state.page <= 1) return;
-        state.page -= 1;
-        render();
-      });
-      document.getElementById("kbNextBtn")?.addEventListener("click", () => {
-        if (state.page >= pages) return;
-        state.page += 1;
-        render();
-      });
-    }
-
-    function renderMeta() {
-      const el = document.getElementById("kbDetailMeta");
-      if (!el) return;
-      const pages = Math.max(1, Math.ceil(state.rows.length / state.pageSize));
-      el.textContent = `筛选后 ${state.rows.length} 条记录，当前第 ${state.page} / ${pages} 页`;
-    }
-
-    function render() {
-      renderTable();
-      renderPagination();
-      renderMeta();
-    }
-
-    document.getElementById("kbDetailSearchBtn")?.addEventListener("click", () => {
-      state.keyword = document.getElementById("kbDetailKeyword")?.value || "";
-      applyFilter();
-    });
-    document.getElementById("kbDetailResetBtn")?.addEventListener("click", () => {
-      const input = document.getElementById("kbDetailKeyword");
-      if (input) input.value = "";
-      state.keyword = "";
-      applyFilter();
-    });
-    document.getElementById("kbDetailKeyword")?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        state.keyword = e.target.value || "";
-        applyFilter();
-      }
-    });
-
-    render();
-  </script>
 </body>
 </html>

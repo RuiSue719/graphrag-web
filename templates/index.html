@@ -188,7 +188,7 @@
 
       <main id="qaModule" class="content module">
       <aside class="engineer-inline" aria-label="Q版女性工程师形象">
-        <img src="{{ url_for('static', filename='assets/engineer.png') }}" alt="工程师形象" />
+        <img src="{{ url_for('static', filename='assets/boy.png') }}" alt="工程师形象" />
       </aside>
       <section class="welcome-card">
         <h1>Hi，欢迎来到风电设备故障诊断一体化问答系统</h1>
@@ -335,6 +335,25 @@
         <div id="decisionMessage" class="profile-msg"></div>
         <div id="decisionTableWrap" class="admin-table-wrap"></div>
         <div id="decisionPagination" class="case-pagination"></div>
+      </section>
+      </main>
+
+      <main id="kbDetailModule" class="content module">
+      <section class="welcome-card">
+        <h1>CSV 详细内容</h1>
+        <p id="kbDetailSubLine">请选择图谱管理中的 CSV 文件进行查看。</p>
+      </section>
+      <section class="admin-case-card">
+        <div class="case-toolbar kg-toolbar-manage">
+          <button id="kbDetailBackBtn" class="rect-primary-btn" type="button">图谱管理</button>
+          <input id="kbDetailKeyword" class="case-input" type="text" placeholder="检索关键字（匹配任意列）" />
+          <div></div>
+          <button id="kbDetailSearchBtn" class="ghost-btn" type="button">搜索</button>
+          <button id="kbDetailResetBtn" class="ghost-btn" type="button">重置</button>
+        </div>
+        <div id="kbDetailMeta" class="admin-detail-title"></div>
+        <div id="kbDetailTableWrap" class="admin-table-wrap"></div>
+        <div id="kbDetailPagination" class="case-pagination"></div>
       </section>
       </main>
 

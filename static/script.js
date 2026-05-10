@@ -55,6 +55,14 @@ const kgManageDetailBlock = document.getElementById("kgManageDetailBlock");
 const kgManageDetailTitle = document.getElementById("kgManageDetailTitle");
 const kgManagePagination = document.getElementById("kgManagePagination");
 const kgManageTableWrap = document.getElementById("kgManageTableWrap");
+const kbDetailSubLine = document.getElementById("kbDetailSubLine");
+const kbDetailBackBtn = document.getElementById("kbDetailBackBtn");
+const kbDetailKeyword = document.getElementById("kbDetailKeyword");
+const kbDetailSearchBtn = document.getElementById("kbDetailSearchBtn");
+const kbDetailResetBtn = document.getElementById("kbDetailResetBtn");
+const kbDetailMeta = document.getElementById("kbDetailMeta");
+const kbDetailTableWrap = document.getElementById("kbDetailTableWrap");
+const kbDetailPagination = document.getElementById("kbDetailPagination");
 const consoleUserTotal = document.getElementById("consoleUserTotal");
 const consoleNodeTotal = document.getElementById("consoleNodeTotal");
 const consoleCaseTotal = document.getElementById("consoleCaseTotal");
@@ -189,6 +197,16 @@ const kbManageState = {
   categoryOptions: [],
   selectedFile: "",
 };
+const kbDetailState = {
+  file: "",
+  category: "",
+  columns: [],
+  allRows: [],
+  rows: [],
+  page: 1,
+  pageSize: 10,
+  keyword: "",
+};
 const decisionState = {
   page: 1,
   pageSize: 10,
@@ -305,6 +323,12 @@ function switchModule(targetId) {
     }
   } else if (targetId === "kgManageModule") {
     loadAdminKbFiles();
+  } else if (targetId === "kbDetailModule") {
+    if (kbDetailState.file) {
+      loadKbDetailFile(kbDetailState.file);
+    } else if (kbDetailTableWrap) {
+      kbDetailTableWrap.innerHTML = "<div class='admin-empty'>请先在图谱管理中选择 CSV 文件。</div>";
+    }
   } else if (targetId === "caseModule") {
     loadAdminCaseModule();
   } else if (targetId === "profileModule") {
@@ -1217,6 +1241,101 @@ function resetCaseModalMessage(text = "") {
   }
 }
 
+function renderKbDetailTable() {
+  if (!kbDetailTableWrap) return;
+  const columns = kbDetailState.columns || [];
+  if (!columns.length) {
+    kbDetailTableWrap.innerHTML = "<div class='admin-empty'>当前文件无可展示列。</div>";
+    return;
+  }
+  const offset = (kbDetailState.page - 1) * kbDetailState.pageSize;
+  const rows = (kbDetailState.rows || []).slice(offset, offset + kbDetailState.pageSize);
+  const thead = `<tr>${columns.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr>`;
+  const tbody = rows.length
+    ? rows
+        .map((row) => `<tr>${columns.map((_, i) => `<td>${escapeHtml((row || [])[i] ?? "")}</td>`).join("")}</tr>`)
+        .join("")
+    : `<tr><td colspan="${Math.max(1, columns.length)}">暂无数据</td></tr>`;
+  kbDetailTableWrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+}
+
+function renderKbDetailPagination() {
+  if (!kbDetailPagination) return;
+  const pages = Math.max(1, Math.ceil((kbDetailState.rows || []).length / kbDetailState.pageSize));
+  if (kbDetailState.page > pages) kbDetailState.page = pages;
+  kbDetailPagination.innerHTML = `
+    <span>第 ${kbDetailState.page} / ${pages} 页</span>
+    <span>每页固定 ${kbDetailState.pageSize} 条</span>
+    <button class="case-page-btn" id="kbDetailPrevBtn" ${kbDetailState.page <= 1 ? "disabled" : ""}>上一页</button>
+    <button class="case-page-btn" id="kbDetailNextBtn" ${kbDetailState.page >= pages ? "disabled" : ""}>下一页</button>
+  `;
+  document.getElementById("kbDetailPrevBtn")?.addEventListener("click", () => {
+    if (kbDetailState.page <= 1) return;
+    kbDetailState.page -= 1;
+    renderKbDetailTable();
+    renderKbDetailPagination();
+    renderKbDetailMeta();
+  });
+  document.getElementById("kbDetailNextBtn")?.addEventListener("click", () => {
+    if (kbDetailState.page >= pages) return;
+    kbDetailState.page += 1;
+    renderKbDetailTable();
+    renderKbDetailPagination();
+    renderKbDetailMeta();
+  });
+}
+
+function renderKbDetailMeta() {
+  if (!kbDetailMeta) return;
+  const pages = Math.max(1, Math.ceil((kbDetailState.rows || []).length / kbDetailState.pageSize));
+  kbDetailMeta.textContent = `文件：${kbDetailState.file || "-"} ｜ 类型：${kbDetailState.category || "-"} ｜ 筛选后 ${kbDetailState.rows.length} 条，当前第 ${kbDetailState.page} / ${pages} 页`;
+}
+
+function applyKbDetailFilter() {
+  const kw = (kbDetailState.keyword || "").trim().toLowerCase();
+  if (!kw) {
+    kbDetailState.rows = (kbDetailState.allRows || []).slice();
+  } else {
+    kbDetailState.rows = (kbDetailState.allRows || []).filter((row) =>
+      (row || []).some((cell) => String(cell || "").toLowerCase().includes(kw))
+    );
+  }
+  kbDetailState.page = 1;
+  renderKbDetailTable();
+  renderKbDetailPagination();
+  renderKbDetailMeta();
+}
+
+async function loadKbDetailFile(filename) {
+  if (!kbDetailTableWrap) return;
+  kbDetailTableWrap.innerHTML = "<div class='admin-empty'>正在读取CSV内容...</div>";
+  try {
+    const res = await fetch(`/api/admin/kb-files/${encodeURIComponent(filename)}`);
+    if (res.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "读取失败");
+    kbDetailState.file = data.file || filename;
+    kbDetailState.category = data.category || "";
+    kbDetailState.columns = Array.isArray(data.columns) ? data.columns : [];
+    kbDetailState.allRows = Array.isArray(data.rows) ? data.rows : [];
+    kbDetailState.keyword = "";
+    kbDetailState.rows = kbDetailState.allRows.slice();
+    kbDetailState.page = 1;
+    if (kbDetailSubLine) {
+      kbDetailSubLine.textContent = `文件：${kbDetailState.file} ｜ 类型：${kbDetailState.category || "-"} ｜ 数据行：${kbDetailState.allRows.length}`;
+    }
+    if (kbDetailKeyword) kbDetailKeyword.value = "";
+    renderKbDetailTable();
+    renderKbDetailPagination();
+    renderKbDetailMeta();
+  } catch (e) {
+    kbDetailTableWrap.innerHTML = `<div class='admin-empty'>${escapeHtml(e.message || "读取失败")}</div>`;
+  }
+}
+
 function setCaseModalTab(mode) {
   caseState.modalMode = mode;
   caseManualTabBtn?.classList.toggle("active", mode === "manual");
@@ -1330,7 +1449,8 @@ function renderKbManageTable(rows) {
     btn.addEventListener("click", () => {
       const f = btn.getAttribute("data-file") || "";
       if (!f) return;
-      window.location.href = `/admin/kb-files/view/${encodeURIComponent(f)}`;
+      kbDetailState.file = f;
+      switchModule("kbDetailModule");
     });
   });
 }
@@ -2593,6 +2713,23 @@ kgCategoryFilter?.addEventListener("change", async () => {
   kbManageState.page = 1;
   await loadAdminKbFiles();
 });
+kbDetailBackBtn?.addEventListener("click", () => switchModule("kgManageModule"));
+kbDetailSearchBtn?.addEventListener("click", () => {
+  kbDetailState.keyword = (kbDetailKeyword?.value || "").trim();
+  applyKbDetailFilter();
+});
+kbDetailResetBtn?.addEventListener("click", () => {
+  kbDetailState.keyword = "";
+  kbDetailState.page = 1;
+  if (kbDetailKeyword) kbDetailKeyword.value = "";
+  applyKbDetailFilter();
+});
+kbDetailKeyword?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    kbDetailState.keyword = (kbDetailKeyword?.value || "").trim();
+    applyKbDetailFilter();
+  }
+});
 
 profileSaveBtn?.addEventListener("click", saveUserProfile);
 profileAvatarInput?.addEventListener("change", (e) => {
@@ -2708,7 +2845,12 @@ loadModels();
 loadFaqs();
 renderCitation();
 initLayoutResizer();
-const initialModule = new URLSearchParams(window.location.search).get("module");
+const queryParams = new URLSearchParams(window.location.search);
+const initialModule = queryParams.get("module");
+const initialFile = queryParams.get("file");
+if (initialFile) {
+  kbDetailState.file = initialFile;
+}
 const defaultModule = isAdminUser ? "consoleModule" : "homeModule";
 const targetModule = initialModule && document.getElementById(initialModule) ? initialModule : defaultModule;
 switchModule(targetModule);

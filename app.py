@@ -2610,15 +2610,7 @@ def admin_kb_file_view_page(filename: str):
     if not target.exists() or not target.is_file():
         return "文件不存在", 404
 
-    parsed = read_csv_rows(target)
-    return render_template(
-        "kb_file_detail.html",
-        file=safe_name,
-        category=_kb_file_category(safe_name),
-        columns=parsed["columns"],
-        rows=parsed["rows"],
-        row_count=len(parsed["rows"]),
-    )
+    return redirect(url_for("index", module="kbDetailModule", file=safe_name))
 
 
 @app.post("/api/admin/kb-files/upload")
