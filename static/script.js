@@ -2708,4 +2708,7 @@ loadModels();
 loadFaqs();
 renderCitation();
 initLayoutResizer();
-switchModule(isAdminUser ? "consoleModule" : "homeModule");
+const initialModule = new URLSearchParams(window.location.search).get("module");
+const defaultModule = isAdminUser ? "consoleModule" : "homeModule";
+const targetModule = initialModule && document.getElementById(initialModule) ? initialModule : defaultModule;
+switchModule(targetModule);

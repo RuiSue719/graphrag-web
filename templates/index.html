@@ -507,12 +507,12 @@
         <h3 id="decisionModalTitle">智能决策详情</h3>
         <button id="decisionModalCloseBtn" class="ghost-btn" type="button">关闭</button>
       </div>
-      <div class="case-form-grid">
-        <label>故障名称<input id="decisionFaultNameInput" type="text" /></label>
-        <label>置信度(%)<input id="decisionConfidenceEditInput" type="number" min="0" max="100" step="0.01" /></label>
-        <label>机理<textarea id="decisionMechanismInput" rows="3"></textarea></label>
-        <label>建议<textarea id="decisionSuggestionsInput" rows="3"></textarea></label>
-        <label>不维修可能后果<textarea id="decisionConsequenceInput" rows="3"></textarea></label>
+      <div class="case-form-grid decision-form-grid">
+        <label class="decision-fault">故障名称<input id="decisionFaultNameInput" type="text" /></label>
+        <label class="decision-confidence">置信度(%)<input id="decisionConfidenceEditInput" type="number" min="0" max="100" step="0.01" /></label>
+        <label class="decision-mechanism">机理<textarea id="decisionMechanismInput" rows="3"></textarea></label>
+        <label class="decision-consequence">不维修可能后果<textarea id="decisionConsequenceInput" rows="3"></textarea></label>
+        <label class="decision-suggestions">建议<textarea id="decisionSuggestionsInput" rows="3"></textarea></label>
       </div>
       <div class="case-modal-actions">
         <button id="decisionModalSaveBtn" class="rect-primary-btn" type="button">保存</button>

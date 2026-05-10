@@ -1189,6 +1189,25 @@ body {
   resize: vertical;
 }
 
+.decision-form-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  grid-template-areas:
+    "fault confidence"
+    "mechanism mechanism"
+    "consequence suggestions";
+}
+
+.decision-form-grid .decision-fault { grid-area: fault; }
+.decision-form-grid .decision-confidence { grid-area: confidence; }
+.decision-form-grid .decision-mechanism { grid-area: mechanism; }
+.decision-form-grid .decision-consequence { grid-area: consequence; }
+.decision-form-grid .decision-suggestions { grid-area: suggestions; }
+
+.decision-form-grid .decision-consequence textarea,
+.decision-form-grid .decision-suggestions textarea {
+  min-height: 180px;
+}
+
 .profile-form-grid input[readonly] {
   background: #f2f6ff;
   color: #667b9f;
