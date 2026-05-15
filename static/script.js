@@ -149,6 +149,7 @@ const decisionSuggestionsInput = document.getElementById("decisionSuggestionsInp
 const decisionConsequenceInput = document.getElementById("decisionConsequenceInput");
 const decisionModalSaveBtn = document.getElementById("decisionModalSaveBtn");
 const decisionModalMessage = document.getElementById("decisionModalMessage");
+const decisionReportDetail = document.getElementById("decisionReportDetail");
 
 let selectedImage = null;
 let recognition = null;
@@ -1018,7 +1019,7 @@ async function loadDecisionModule() {
 
 function renderDecisionTable(rows) {
   if (!decisionTableWrap) return;
-  const columns = ["故障名称", "机理", "建议", "不维修可能后果"];
+  const columns = ["故障名称", "机理", "建议", "不维修可能后果", "RUL", "状态评估与风险等级", "健康趋势图", "震动频谱图"];
   const thead = `<tr>${columns.map((c) => `<th>${c}</th>`).join("")}<th>操作</th></tr>`;
   const safeRows = Array.isArray(rows) ? rows : [];
   const tbody = safeRows.length
@@ -1030,6 +1031,10 @@ function renderDecisionTable(rows) {
         <td title="${escapeHtml(row["机理"] || "")}">${escapeHtml(truncateText(row["机理"] || "", 10))}</td>
         <td title="${escapeHtml(row["建议"] || "")}">${escapeHtml(truncateText(row["建议"] || "", 10))}</td>
         <td title="${escapeHtml(row["不维修可能后果"] || "")}">${escapeHtml(truncateText(row["不维修可能后果"] || "", 10))}</td>
+        <td>${escapeHtml(String(row["RUL"] ?? "-"))}</td>
+        <td title="${escapeHtml(row["状态评估与风险等级"] || "")}">${escapeHtml(truncateText(row["状态评估与风险等级"] || "-", 14))}</td>
+        <td>${row["健康趋势图"] ? "已生成" : "-"}</td>
+        <td>${row["震动频谱图"] ? "已生成" : "-"}</td>
         <td>
           <button class="case-op-btn" data-op="detail" data-id="${Number(row.id || 0)}">查看详情</button>
           <button class="case-op-btn" data-op="edit" data-id="${Number(row.id || 0)}">编辑</button>
@@ -1039,7 +1044,7 @@ function renderDecisionTable(rows) {
       </tr>`,
         )
         .join("")
-    : `<tr><td colspan="5">暂无数据</td></tr>`;
+    : `<tr><td colspan="9">暂无数据</td></tr>`;
   decisionTableWrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
 
   decisionTableWrap.querySelectorAll(".case-op-btn").forEach((btn) => {
@@ -1133,6 +1138,7 @@ function closeDecisionModal() {
   decisionEditModal?.classList.add("hidden");
   decisionModalState.editId = 0;
   decisionModalState.mode = "detail";
+  if (decisionReportDetail) decisionReportDetail.innerHTML = "";
   setDecisionModalMessage("");
 }
 
@@ -1153,6 +1159,25 @@ async function openDecisionModal(mode, recordId) {
     if (decisionRiskLevelInput) decisionRiskLevelInput.value = row.riskLevel || "-";
     if (decisionSuggestionsInput) decisionSuggestionsInput.value = row["建议"] || "";
     if (decisionConsequenceInput) decisionConsequenceInput.value = row["不维修可能后果"] || "";
+    if (decisionReportDetail) {
+      const trendSvg = row["健康趋势图"] || "";
+      const fftSvg = row["震动频谱图"] || "";
+      decisionReportDetail.innerHTML = `
+        <div class="admin-detail-title">综合维护报告详情</div>
+        <div class="admin-table-scroll" style="max-height:50vh;padding:10px;">
+          <div><b>RUL：</b>${escapeHtml(String(row["RUL"] ?? "-"))} 小时</div>
+          <div style="margin-top:6px;"><b>状态评估与风险等级：</b>${escapeHtml(row["状态评估与风险等级"] || "-")}</div>
+          <div style="margin-top:10px;"><b>健康趋势图</b></div>
+          <div>${trendSvg || "<div class='admin-empty'>无</div>"}</div>
+          <div style="margin-top:10px;"><b>震动频谱图</b></div>
+          <div>${fftSvg || "<div class='admin-empty'>无</div>"}</div>
+          <div style="margin-top:10px;"><b>综合维护报告文本</b></div>
+          <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e4e8ef;border-radius:8px;padding:8px;">${escapeHtml(
+            row["综合维护报告"] || "-"
+          )}</pre>
+        </div>
+      `;
+    }
     setDecisionModalEditable(decisionModalState.mode === "edit");
     setDecisionModalMessage(
       decisionModalState.mode === "edit" ? "可编辑并保存全部字段。" : `风险程度：${row.riskLevel || "-"}`
@@ -1237,6 +1262,8 @@ async function saveDiagToDecision() {
         dataset: result.dataset || diagState.dataset || "",
         model: result.modelCanonical || result.model || diagState.model || "",
         filePath: result.filePath || diagState.filePath || "",
+        signal: Array.isArray(result.signal) ? result.signal : [],
+        fft: Array.isArray(result.fft) ? result.fft : [],
       }),
     });
     const data = await res.json();
@@ -1786,11 +1813,7 @@ function renderHistory() {
 
 function isHistorySessionVisible(session) {
   const ts = Number(session?.updatedAt || session?.createdAt || 0);
-  if (!Number.isFinite(ts) || ts <= 0) {
-    return false;
-  }
-  const d = new Date(ts);
-  return d.getMonth() + 1 === HISTORY_VISIBLE_MONTH && d.getDate() === HISTORY_VISIBLE_DAY;
+  return Number.isFinite(ts) && ts > 0;
 }
 
 function renderCurrentSession() {

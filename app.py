@@ -1102,12 +1102,28 @@ def init_user_db() -> None:
                 source_dataset TEXT DEFAULT '',
                 source_model TEXT DEFAULT '',
                 source_file TEXT DEFAULT '',
+                rul_hours REAL NOT NULL DEFAULT 0,
+                status_risk TEXT DEFAULT '',
+                trend_svg TEXT DEFAULT '',
+                fft_svg TEXT DEFAULT '',
+                report_markdown TEXT DEFAULT '',
                 created_by TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
             """
         )
+        decision_columns = {row["name"] for row in conn.execute("PRAGMA table_info(intelligent_decision_records)").fetchall()}
+        if "rul_hours" not in decision_columns:
+            conn.execute("ALTER TABLE intelligent_decision_records ADD COLUMN rul_hours REAL NOT NULL DEFAULT 0")
+        if "status_risk" not in decision_columns:
+            conn.execute("ALTER TABLE intelligent_decision_records ADD COLUMN status_risk TEXT DEFAULT ''")
+        if "trend_svg" not in decision_columns:
+            conn.execute("ALTER TABLE intelligent_decision_records ADD COLUMN trend_svg TEXT DEFAULT ''")
+        if "fft_svg" not in decision_columns:
+            conn.execute("ALTER TABLE intelligent_decision_records ADD COLUMN fft_svg TEXT DEFAULT ''")
+        if "report_markdown" not in decision_columns:
+            conn.execute("ALTER TABLE intelligent_decision_records ADD COLUMN report_markdown TEXT DEFAULT ''")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS maintenance_report_records (
@@ -1352,6 +1368,11 @@ def _decision_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         "建议": row["suggestions"] or "",
         "不维修可能后果": row["consequence"] or "",
         "riskLevel": row["risk_level"] or "",
+        "RUL": round(float(row["rul_hours"] or 0.0), 2),
+        "状态评估与风险等级": row["status_risk"] or "",
+        "健康趋势图": row["trend_svg"] or "",
+        "震动频谱图": row["fft_svg"] or "",
+        "综合维护报告": row["report_markdown"] or "",
         "confidence": round(float(row["confidence"] or 0.0), 2),
         "source": row["source"] or "",
         "sourceDataset": row["source_dataset"] or "",
@@ -1378,7 +1399,8 @@ def _query_decision_row(record_id: int) -> Optional[sqlite3.Row]:
         cur = conn.execute(
             f"""
             SELECT id, fault_name, fault_category, mechanism, suggestions, consequence,
-                   confidence, risk_level, source, source_dataset, source_model, source_file, updated_at
+                   confidence, risk_level, source, source_dataset, source_model, source_file,
+                   rul_hours, status_risk, trend_svg, fft_svg, report_markdown, updated_at
             FROM intelligent_decision_records
             WHERE {where_sql}
             LIMIT 1
@@ -1806,22 +1828,42 @@ def _status_eval_by_health_score(score: float) -> str:
     return "设备退化严重，建议立即检修并评估停机风险。"
 
 
-def _build_simple_svg_line(points: List[float], width: int = 760, height: int = 220, color: str = "#2f6fed") -> str:
+def _build_simple_svg_line(
+    points: List[float],
+    width: int = 760,
+    height: int = 220,
+    color: str = "#2f6fed",
+    x_label: str = "时间窗口",
+    y_label: str = "幅值",
+    y_unit: str = "",
+) -> str:
     if not points:
         points = [0.0, 0.0]
     n = len(points)
     min_v = min(points)
     max_v = max(points)
     span = max(max_v - min_v, 1e-8)
+    left = 58
+    right = width - 16
+    top = 16
+    bottom = height - 34
     coords: List[str] = []
     for i, v in enumerate(points):
-        x = 20 + (i / max(1, n - 1)) * (width - 40)
-        y = 15 + (1.0 - (v - min_v) / span) * (height - 30)
+        x = left + (i / max(1, n - 1)) * (right - left)
+        y = top + (1.0 - (v - min_v) / span) * (bottom - top)
         coords.append(f"{x:.2f},{y:.2f}")
     pts = " ".join(coords)
+    y_title = f"{y_label}{f' ({y_unit})' if y_unit else ''}"
+    mid_y = (top + bottom) / 2.0
     return (
         f"<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' viewBox='0 0 {width} {height}'>"
         "<rect x='0' y='0' width='100%' height='100%' fill='#ffffff'/>"
+        f"<line x1='{left}' y1='{bottom}' x2='{right}' y2='{bottom}' stroke='#8fa3c8' stroke-width='1'/>"
+        f"<line x1='{left}' y1='{top}' x2='{left}' y2='{bottom}' stroke='#8fa3c8' stroke-width='1'/>"
+        f"<text x='{(left + right) / 2:.1f}' y='{height - 8}' text-anchor='middle' fill='#516489' font-size='11'>{x_label}</text>"
+        f"<text x='14' y='{mid_y:.1f}' transform='rotate(-90 14 {mid_y:.1f})' text-anchor='middle' fill='#516489' font-size='11'>{y_title}</text>"
+        f"<text x='{left - 6}' y='{top + 4:.1f}' text-anchor='end' fill='#6d7fa2' font-size='10'>{max_v:.2f}</text>"
+        f"<text x='{left - 6}' y='{bottom + 4:.1f}' text-anchor='end' fill='#6d7fa2' font-size='10'>{min_v:.2f}</text>"
         f"<polyline fill='none' stroke='{color}' stroke-width='2' points='{pts}'/>"
         "</svg>"
     )
@@ -1921,8 +1963,20 @@ def build_maintenance_report_html(
     trend_points: List[float],
     fft_points: List[float],
 ) -> str:
-    trend_svg = _build_simple_svg_line(trend_points, color="#2f6fed")
-    fft_svg = _build_simple_svg_line(fft_points[:256], color="#d64f4f")
+    trend_svg = _build_simple_svg_line(
+        trend_points,
+        color="#2f6fed",
+        x_label="时间窗口 (step)",
+        y_label="健康度",
+        y_unit="%",
+    )
+    fft_svg = _build_simple_svg_line(
+        fft_points[:256],
+        color="#d64f4f",
+        x_label="频率点 (bin)",
+        y_label="振动幅值",
+        y_unit="a.u.",
+    )
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -2364,6 +2418,7 @@ def admin_case_records():
     return jsonify(
         {
             "columns": ["故障位置", "关联", "后果", "案例来源"],
+            "columns": ["故障名称", "机理", "建议", "不维修可能后果", "RUL", "状态评估与风险等级", "健康趋势图", "震动频谱图"],
             "rows": rows,
             "pagination": {"page": page, "pageSize": page_size, "total": total, "pages": pages},
             "sourceOptions": source_options,
@@ -2550,7 +2605,8 @@ def intelligent_decisions():
         cur = conn.execute(
             f"""
             SELECT id, fault_name, fault_category, mechanism, suggestions, consequence,
-                   confidence, risk_level, source, source_dataset, source_model, source_file, updated_at
+                   confidence, risk_level, source, source_dataset, source_model, source_file,
+                   rul_hours, status_risk, trend_svg, fft_svg, report_markdown, updated_at
             FROM intelligent_decision_records
             {where_clause}
             ORDER BY id DESC
@@ -2625,10 +2681,40 @@ def intelligent_decision_from_diagnosis():
     dataset = str(payload.get("dataset", "") or "").strip()
     model = str(payload.get("model", "") or "").strip()
     file_path = str(payload.get("filePath", "") or "").strip()
+    signal = payload.get("signal") or []
+    fft = payload.get("fft") or []
     try:
         built = build_decision_payload(prediction, confidence)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    report_obj: Dict[str, Any] = {}
+    trend_svg = ""
+    fft_svg = ""
+    report_md = ""
+    rul_hours = 0.0
+    status_risk = built.get("risk_level", "")
+    if dataset in {"CWRU", "MFPT"} and isinstance(signal, list) and signal:
+        try:
+            report_obj = build_cnn_lstm_trend_and_rul(dataset, signal, prediction, confidence)
+            rul_hours = float(report_obj.get("rulHours", 0.0) or 0.0)
+            status_risk = f"{report_obj.get('statusEvaluation', '')} 风险等级：{report_obj.get('riskLevel', '-')}".strip()
+            trend_svg = _build_simple_svg_line(
+                [float(v) for v in report_obj.get("healthSeries", [])],
+                color="#2f6fed",
+                x_label="时间窗口 (step)",
+                y_label="健康度",
+                y_unit="%",
+            )
+            fft_svg = _build_simple_svg_line(
+                [float(v) for v in (fft[:256] if isinstance(fft, list) else [])],
+                color="#d64f4f",
+                x_label="频率点 (bin)",
+                y_label="振动幅值",
+                y_unit="a.u.",
+            )
+            report_md = build_maintenance_report_text(report_obj, "数控机床主轴轴承", file_path)
+        except Exception:
+            pass
 
     now = _utc_now_iso()
     created_by = (session.get("username") or "").strip() or "unknown"
@@ -2638,9 +2724,10 @@ def intelligent_decision_from_diagnosis():
             INSERT INTO intelligent_decision_records (
                 fault_name, fault_category, mechanism, suggestions, consequence,
                 confidence, risk_level, source, source_dataset, source_model, source_file,
+                rul_hours, status_risk, trend_svg, fft_svg, report_markdown,
                 created_by, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 built["fault_name"],
@@ -2654,6 +2741,11 @@ def intelligent_decision_from_diagnosis():
                 dataset,
                 model,
                 file_path,
+                rul_hours,
+                status_risk,
+                trend_svg,
+                fft_svg,
+                report_md,
                 created_by,
                 now,
                 now,

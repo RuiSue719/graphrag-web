@@ -2296,6 +2296,54 @@ textarea:focus {
   background: #2d4bdc;
 }
 
+/* White theme override: global buttons and shadows */
+:root {
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.app-shell,
+.welcome-card,
+.diag-shell,
+.diag-result-wrap,
+.admin-case-card,
+.admin-file-list-card,
+.admin-file-detail-card,
+.case-modal-card,
+.node-detail-modal {
+  box-shadow: var(--shadow) !important;
+}
+
+button,
+.rect-primary-btn,
+.ghost-btn,
+.diag-run-btn,
+.action-btn,
+.send-btn,
+.case-op-btn,
+.case-page-btn,
+.graph-zoom-btn,
+.size-arrow-btn,
+.login-btn {
+  background: #ffffff !important;
+  color: #2f3d56 !important;
+  border: 1px solid #dfe4ec !important;
+  box-shadow: none !important;
+}
+
+button:hover,
+.rect-primary-btn:hover,
+.ghost-btn:hover,
+.diag-run-btn:hover,
+.action-btn:hover,
+.send-btn:hover,
+.case-op-btn:hover,
+.case-page-btn:hover,
+.graph-zoom-btn:hover,
+.size-arrow-btn:hover,
+.login-btn:hover {
+  background: #f8f9fb !important;
+}
+
 .login-switch {
   text-align: center;
   font-size: 14px;
