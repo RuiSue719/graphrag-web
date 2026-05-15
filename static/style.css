@@ -1103,6 +1103,24 @@ body {
   z-index: 1;
 }
 
+.decision-table th:last-child,
+.decision-table td:last-child {
+  position: sticky;
+  right: 0;
+  min-width: 230px;
+}
+
+.decision-table th:last-child {
+  background: #f4f8ff;
+  z-index: 4;
+}
+
+.decision-table td:last-child {
+  background: #fff;
+  z-index: 2;
+  box-shadow: -10px 0 12px -12px rgba(45, 67, 106, 0.45);
+}
+
 .admin-empty {
   color: #6e7f9f;
   font-size: 13px;
@@ -1491,6 +1509,15 @@ body {
 .diag-card.active {
   border-color: #8ea9e8;
   background: linear-gradient(180deg, #e6eeff, #d9e7ff);
+  box-shadow: 0 0 0 2px rgba(82, 122, 214, 0.22);
+  transform: translateY(-1px);
+}
+
+.diag-card[data-active="true"] {
+  border-color: #8ea9e8;
+  background: linear-gradient(180deg, #e6eeff, #d9e7ff);
+  box-shadow: 0 0 0 2px rgba(82, 122, 214, 0.22);
+  transform: translateY(-1px);
 }
 
 .diag-card-title {
@@ -1538,6 +1565,17 @@ body {
 .diag-seg.active {
   border-color: #8ea9e8;
   background: linear-gradient(180deg, #e6eeff, #d9e7ff);
+  box-shadow: 0 0 0 2px rgba(82, 122, 214, 0.22);
+  color: #233f70;
+  font-weight: 600;
+}
+
+.diag-seg[data-active="true"] {
+  border-color: #8ea9e8;
+  background: linear-gradient(180deg, #e6eeff, #d9e7ff);
+  box-shadow: 0 0 0 2px rgba(82, 122, 214, 0.22);
+  color: #233f70;
+  font-weight: 600;
 }
 
 .diag-model-tip {

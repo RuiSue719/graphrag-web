@@ -2854,6 +2854,20 @@ def intelligent_decision_export_md(record_id: int):
     return resp
 
 
+@app.get("/api/intelligent-decisions/<int:record_id>/export-maintenance-report")
+def intelligent_decision_export_maintenance_report(record_id: int):
+    row = _query_decision_row(record_id)
+    if not row:
+        return jsonify({"error": "记录不存在或无权限访问。"}), 404
+    report_md = str(row["report_markdown"] or "").strip()
+    if not report_md:
+        return jsonify({"error": "该记录暂无综合维护报告。"}), 400
+    filename = f"综合维护报告_{record_id}.md"
+    resp = Response(report_md, mimetype="text/markdown; charset=utf-8")
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{requests.utils.quote(filename)}"
+    return resp
+
+
 @app.get("/api/admin/console")
 def admin_console():
     if not is_admin_session():

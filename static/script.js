@@ -130,7 +130,6 @@ const diagSaveDecisionMsg = document.getElementById("diagSaveDecisionMsg");
 const decisionFaultInput = document.getElementById("decisionFaultInput");
 const decisionConfidenceInput = document.getElementById("decisionConfidenceInput");
 const decisionGenerateBtn = document.getElementById("decisionGenerateBtn");
-const decisionGenerateMaintReportBtn = document.getElementById("decisionGenerateMaintReportBtn");
 const decisionSearchInput = document.getElementById("decisionSearchInput");
 const decisionSearchBtn = document.getElementById("decisionSearchBtn");
 const decisionResetBtn = document.getElementById("decisionResetBtn");
@@ -357,8 +356,13 @@ function updateDiagRunButtonState() {
 
 function setActiveDiagButton(container, attrName, value) {
   if (!container) return;
+  const target = String(value ?? "").trim().toLowerCase();
   container.querySelectorAll("button").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute(attrName) === value);
+    const attrValue = String(btn.getAttribute(attrName) || "").trim().toLowerCase();
+    const isActive = Boolean(target) && attrValue === target;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("data-active", isActive ? "true" : "false");
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 }
 
@@ -1039,13 +1043,13 @@ function renderDecisionTable(rows) {
           <button class="case-op-btn" data-op="detail" data-id="${Number(row.id || 0)}">查看详情</button>
           <button class="case-op-btn" data-op="edit" data-id="${Number(row.id || 0)}">编辑</button>
           <button class="case-op-btn danger" data-op="delete" data-id="${Number(row.id || 0)}">删除</button>
-          <button class="case-op-btn" data-op="download" data-id="${Number(row.id || 0)}">下载MD</button>
+          <button class="case-op-btn" data-op="download" data-id="${Number(row.id || 0)}">下载综合维护报告</button>
         </td>
       </tr>`,
         )
         .join("")
     : `<tr><td colspan="9">暂无数据</td></tr>`;
-  decisionTableWrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+  decisionTableWrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table decision-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
 
   decisionTableWrap.querySelectorAll(".case-op-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -1053,7 +1057,7 @@ function renderDecisionTable(rows) {
       const recordId = Number(btn.getAttribute("data-id") || 0);
       if (!recordId) return;
       if (op === "download") {
-        window.open(`/api/intelligent-decisions/${recordId}/export-md`, "_blank");
+        window.open(`/api/intelligent-decisions/${recordId}/export-maintenance-report`, "_blank");
         return;
       }
       if (op === "detail") {
@@ -2744,7 +2748,6 @@ caseSourceFilter?.addEventListener("change", async () => {
   await loadAdminCaseModule();
 });
 decisionGenerateBtn?.addEventListener("click", generateDecisionByInput);
-decisionGenerateMaintReportBtn?.addEventListener("click", generateMaintenanceReportFromDiag);
 decisionSearchBtn?.addEventListener("click", async () => {
   decisionState.keyword = (decisionSearchInput?.value || "").trim();
   decisionState.page = 1;
