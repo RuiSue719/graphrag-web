@@ -1252,23 +1252,43 @@ body {
 /* 添加记录弹窗使用独立网格，避免复用详情网格区域导致字段重叠 */
 #decisionCreateModal .decision-create-form-grid {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-  grid-template-areas: none !important;
+  grid-template-areas:
+    "fault confidence"
+    "mechanism suggestions"
+    "consequence consequence"
+    "dataset model"
+    "file file" !important;
+  gap: 12px 12px;
 }
 
 #decisionCreateModal .decision-create-form-grid > label {
-  grid-area: auto !important;
+  grid-area: auto;
   line-height: 1.45;
+  font-size: 13px;
 }
 
-#decisionCreateModal .decision-create-form-grid .decision-mechanism,
-#decisionCreateModal .decision-create-form-grid .decision-suggestions,
-#decisionCreateModal .decision-create-form-grid .decision-consequence {
-  grid-column: span 1;
+#decisionCreateModal .decision-create-form-grid .decision-fault { grid-area: fault !important; }
+#decisionCreateModal .decision-create-form-grid .decision-confidence { grid-area: confidence !important; }
+#decisionCreateModal .decision-create-form-grid .decision-mechanism { grid-area: mechanism !important; }
+#decisionCreateModal .decision-create-form-grid .decision-suggestions { grid-area: suggestions !important; }
+#decisionCreateModal .decision-create-form-grid .decision-consequence { grid-area: consequence !important; }
+#decisionCreateModal .decision-create-form-grid .decision-dataset { grid-area: dataset !important; }
+#decisionCreateModal .decision-create-form-grid .decision-model { grid-area: model !important; }
+#decisionCreateModal .decision-create-form-grid .decision-file { grid-area: file !important; }
+
+#decisionCreateModal .decision-create-form-grid textarea {
+  min-height: 126px !important;
+  line-height: 1.5;
+}
+
+#decisionCreateModal .decision-create-form-grid input {
+  line-height: 1.4;
 }
 
 @media (max-width: 980px) {
   #decisionCreateModal .decision-create-form-grid {
     grid-template-columns: 1fr !important;
+    grid-template-areas: none !important;
   }
 }
 

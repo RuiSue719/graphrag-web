@@ -153,6 +153,7 @@ const decisionConsequenceInput = document.getElementById("decisionConsequenceInp
 const decisionModalSaveBtn = document.getElementById("decisionModalSaveBtn");
 const decisionModalMessage = document.getElementById("decisionModalMessage");
 const decisionReportDetail = document.getElementById("decisionReportDetail");
+const decisionEditFormGrid = decisionEditModal?.querySelector(".decision-form-grid");
 const decisionCreateModal = document.getElementById("decisionCreateModal");
 const decisionCreateModalCloseBtn = document.getElementById("decisionCreateModalCloseBtn");
 const decisionCreateManualTabBtn = document.getElementById("decisionCreateManualTabBtn");
@@ -1173,6 +1174,9 @@ function renderDecisionPagination() {
 }
 
 function setDecisionModalEditable(editable) {
+  if (decisionEditFormGrid) {
+    decisionEditFormGrid.style.display = editable ? "grid" : "none";
+  }
   [decisionFaultNameInput, decisionConfidenceEditInput, decisionMechanismInput, decisionSuggestionsInput, decisionConsequenceInput].forEach((el) => {
     if (!el) return;
     el.readOnly = !editable;
@@ -1243,7 +1247,7 @@ async function openDecisionModal(mode, recordId) {
     const row = data.record || {};
     decisionModalState.mode = mode === "edit" ? "edit" : "detail";
     decisionModalState.editId = Number(recordId || 0);
-    if (decisionModalTitle) decisionModalTitle.textContent = decisionModalState.mode === "edit" ? "编辑智能决策" : "智能决策详情";
+    if (decisionModalTitle) decisionModalTitle.textContent = decisionModalState.mode === "edit" ? "编辑智能决策" : "综合维护报告详情";
     if (decisionFaultNameInput) decisionFaultNameInput.value = String(decisionField(row, "faultName", "故障名称") || "");
     if (decisionConfidenceEditInput) decisionConfidenceEditInput.value = String(row.confidence ?? 0);
     if (decisionMechanismInput) decisionMechanismInput.value = String(decisionField(row, "mechanismText", "机理") || "");
@@ -1278,7 +1282,7 @@ async function openDecisionModal(mode, recordId) {
     }
 
     setDecisionModalEditable(decisionModalState.mode === "edit");
-    setDecisionModalMessage(decisionModalState.mode === "edit" ? "可编辑并保存全部字段。" : `风险程度：${row.riskLevel || "-"}`);
+    setDecisionModalMessage(decisionModalState.mode === "edit" ? "可编辑并保存全部字段。" : "");
     decisionEditModal?.classList.remove("hidden");
   } catch (e) {
     setDecisionMessage(e.message || "读取记录失败");
