@@ -130,6 +130,9 @@ const diagSaveDecisionMsg = document.getElementById("diagSaveDecisionMsg");
 const decisionFaultInput = document.getElementById("decisionFaultInput");
 const decisionConfidenceInput = document.getElementById("decisionConfidenceInput");
 const decisionGenerateBtn = document.getElementById("decisionGenerateBtn");
+const decisionAddBtn = document.getElementById("decisionAddBtn");
+const decisionCreateBlock = document.getElementById("decisionCreateBlock");
+const decisionCreateCancelBtn = document.getElementById("decisionCreateCancelBtn");
 const decisionSearchInput = document.getElementById("decisionSearchInput");
 const decisionSearchBtn = document.getElementById("decisionSearchBtn");
 const decisionResetBtn = document.getElementById("decisionResetBtn");
@@ -980,6 +983,11 @@ function setDecisionMessage(text = "") {
   }
 }
 
+function toggleDecisionCreateBlock(show) {
+  if (!decisionCreateBlock) return;
+  decisionCreateBlock.classList.toggle("hidden", !show);
+}
+
 function truncateText(text, limit = 10) {
   const s = String(text || "");
   return s.length > limit ? `${s.slice(0, limit)}...` : s;
@@ -990,6 +998,7 @@ async function loadDecisionModule() {
     return;
   }
   decisionTableWrap.innerHTML = "<div class='admin-empty'>正在加载智能决策记录...</div>";
+  toggleDecisionCreateBlock(false);
   setDecisionMessage("");
   try {
     const params = new URLSearchParams({
@@ -1240,6 +1249,9 @@ async function generateDecisionByInput() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "生成失败");
     setDecisionMessage(`已生成并保存，风险程度：${data.record?.riskLevel || "-"}`);
+    if (decisionFaultInput) decisionFaultInput.value = "";
+    if (decisionConfidenceInput) decisionConfidenceInput.value = "";
+    toggleDecisionCreateBlock(false);
     decisionState.page = 1;
     await loadDecisionModule();
   } catch (e) {
@@ -2748,6 +2760,15 @@ caseSourceFilter?.addEventListener("change", async () => {
   await loadAdminCaseModule();
 });
 decisionGenerateBtn?.addEventListener("click", generateDecisionByInput);
+decisionAddBtn?.addEventListener("click", () => {
+  toggleDecisionCreateBlock(true);
+  decisionFaultInput?.focus();
+});
+decisionCreateCancelBtn?.addEventListener("click", () => {
+  if (decisionFaultInput) decisionFaultInput.value = "";
+  if (decisionConfidenceInput) decisionConfidenceInput.value = "";
+  toggleDecisionCreateBlock(false);
+});
 decisionSearchBtn?.addEventListener("click", async () => {
   decisionState.keyword = (decisionSearchInput?.value || "").trim();
   decisionState.page = 1;

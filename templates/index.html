@@ -328,12 +328,20 @@
       </section>
       <section class="admin-case-card">
         <div class="case-toolbar decision-toolbar">
-          <input id="decisionFaultInput" class="case-input" type="text" placeholder="输入故障名称，如：内圈故障-(0.014英寸)" />
-          <input id="decisionConfidenceInput" class="case-input" type="number" min="0" max="100" step="0.01" placeholder="置信度(%)，如 86.3" />
-          <button id="decisionGenerateBtn" class="rect-primary-btn" type="button">生成并保存</button>
+          <button id="decisionAddBtn" class="rect-primary-btn" type="button">添加记录</button>
+          <div class="decision-toolbar-spacer"></div>
           <input id="decisionSearchInput" class="case-input" type="text" placeholder="搜索故障名称/机理/建议/后果" />
           <button id="decisionSearchBtn" class="ghost-btn" type="button">搜索</button>
           <button id="decisionResetBtn" class="ghost-btn" type="button">重置</button>
+        </div>
+        <div id="decisionCreateBlock" class="hidden">
+          <div class="admin-detail-title">添加智能决策记录</div>
+          <div class="case-toolbar decision-create-toolbar">
+            <input id="decisionFaultInput" class="case-input" type="text" placeholder="输入故障名称，如：内圈故障-(0.014英寸)" />
+            <input id="decisionConfidenceInput" class="case-input" type="number" min="0" max="100" step="0.01" placeholder="置信度(%)，如 86.3" />
+            <button id="decisionGenerateBtn" class="rect-primary-btn" type="button">生成并保存</button>
+            <button id="decisionCreateCancelBtn" class="ghost-btn" type="button">取消</button>
+          </div>
         </div>
         <div id="decisionModuleMeta" class="admin-detail-title"></div>
         <div id="decisionMessage" class="profile-msg"></div>

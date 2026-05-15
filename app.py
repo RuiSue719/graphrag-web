@@ -994,6 +994,49 @@ def resolve_fault_category(fault_name: str) -> str:
     return ""
 
 
+def infer_diag_fault_category(dataset: str, prediction: str) -> str:
+    """从诊断标签稳健推断故障类别，避免标签格式差异导致保存失败。"""
+    text = (prediction or "").strip()
+    if not text:
+        return ""
+
+    direct = resolve_fault_category(text)
+    if direct:
+        return direct
+
+    ds = (dataset or "").strip().upper()
+    labels = DIAG_CLASS_NAMES.get(ds) or []
+    if text in labels:
+        idx = labels.index(text)
+        if ds == "MFPT":
+            if idx == 0:
+                return DECISION_FAULT_CATEGORIES[0]
+            if idx == 1:
+                return DECISION_FAULT_CATEGORIES[1]
+            if idx == 2:
+                return DECISION_FAULT_CATEGORIES[2]
+        if ds == "CWRU":
+            if idx == 0:
+                return DECISION_FAULT_CATEGORIES[0]
+            if 1 <= idx <= 3:
+                return DECISION_FAULT_CATEGORIES[2]
+            if 4 <= idx <= 6:
+                return DECISION_FAULT_CATEGORIES[1]
+            if idx >= 7 and len(DECISION_FAULT_CATEGORIES) >= 4:
+                return DECISION_FAULT_CATEGORIES[3]
+
+    low = text.lower()
+    if any(k in low for k in ["normal", "healthy"]):
+        return DECISION_FAULT_CATEGORIES[0]
+    if any(k in low for k in ["outer", "outer race"]):
+        return DECISION_FAULT_CATEGORIES[1]
+    if any(k in low for k in ["inner", "inner race"]):
+        return DECISION_FAULT_CATEGORIES[2]
+    if len(DECISION_FAULT_CATEGORIES) >= 4 and any(k in low for k in ["ball", "rolling", "roller"]):
+        return DECISION_FAULT_CATEGORIES[3]
+    return ""
+
+
 def confidence_to_percent(confidence: Any) -> float:
     try:
         value = float(confidence)
@@ -2685,8 +2728,21 @@ def intelligent_decision_from_diagnosis():
     fft = payload.get("fft") or []
     try:
         built = build_decision_payload(prediction, confidence)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        category = infer_diag_fault_category(dataset, prediction)
+        if not category:
+            return jsonify({"error": "无法识别故障类型，暂不支持保存该诊断结果。"}), 400
+        rule = DECISION_RULES.get(category) or {}
+        confidence_percent = confidence_to_percent(confidence)
+        built = {
+            "fault_name": prediction,
+            "fault_category": category,
+            "mechanism": str(rule.get("机理", "") or rule.get("鏈虹悊", "")).strip() or "依据诊断结果推断为该故障类型，建议结合振动与温升趋势进一步复核。",
+            "suggestions": str(rule.get("建议", "") or rule.get("寤鸿", "")).strip() or "建议尽快安排点检，并根据趋势变化决定是否执行预防性维护。",
+            "consequence": str(rule.get("不维修可能后果", "") or rule.get("涓嶇淮淇彲鑳藉悗鏋?", "")).strip() or "若不及时处理，可能导致振动持续恶化并引发停机风险。",
+            "confidence": confidence_percent,
+            "risk_level": risk_level_from_confidence(confidence_percent),
+        }
     report_obj: Dict[str, Any] = {}
     trend_svg = ""
     fft_svg = ""
