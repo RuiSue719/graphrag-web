@@ -1153,6 +1153,31 @@ function riskByConfidence(confidence) {
   return "高风险";
 }
 
+function buildDecisionReportFallbackText(row) {
+  return [
+    "# 数控机床故障综合维护报告",
+    "",
+    "## 1. 记录信息",
+    `- 故障名称：${row["故障名称"] || "-"}`,
+    `- 诊断置信度：${row.confidence ?? 0}%`,
+    `- 风险等级：${row.riskLevel || "-"}`,
+    `- RUL：${row["RUL"] ?? 0} 小时`,
+    `- 状态评估与风险等级：${row["状态评估与风险等级"] || "-"}`,
+    `- 数据集：${row.sourceDataset || "-"}`,
+    `- 模型：${row.sourceModel || "-"}`,
+    `- 样本文件：${row.sourceFile || "-"}`,
+    "",
+    "## 2. 机理",
+    row["机理"] || "-",
+    "",
+    "## 3. 维护建议",
+    row["建议"] || "-",
+    "",
+    "## 4. 不维修可能后果",
+    row["不维修可能后果"] || "-",
+  ].join("\n");
+}
+
 function closeDecisionModal() {
   decisionEditModal?.classList.add("hidden");
   decisionModalState.editId = 0;
@@ -1181,19 +1206,27 @@ async function openDecisionModal(mode, recordId) {
     if (decisionReportDetail) {
       const trendSvg = row["健康趋势图"] || "";
       const fftSvg = row["震动频谱图"] || "";
+      const fullReport = (row["综合维护报告"] || "").trim() || buildDecisionReportFallbackText(row);
       decisionReportDetail.innerHTML = `
         <div class="admin-detail-title">综合维护报告详情</div>
         <div class="admin-table-scroll" style="max-height:50vh;padding:10px;">
+          <div><b>故障名称：</b>${escapeHtml(row["故障名称"] || "-")}</div>
+          <div style="margin-top:6px;"><b>诊断置信度：</b>${escapeHtml(String(row.confidence ?? 0))}%</div>
+          <div style="margin-top:6px;"><b>风险等级：</b>${escapeHtml(row.riskLevel || "-")}</div>
           <div><b>RUL：</b>${escapeHtml(String(row["RUL"] ?? "-"))} 小时</div>
           <div style="margin-top:6px;"><b>状态评估与风险等级：</b>${escapeHtml(row["状态评估与风险等级"] || "-")}</div>
+          <div style="margin-top:6px;"><b>数据集：</b>${escapeHtml(row.sourceDataset || "-")}</div>
+          <div style="margin-top:6px;"><b>模型：</b>${escapeHtml(row.sourceModel || "-")}</div>
+          <div style="margin-top:6px;"><b>样本文件：</b>${escapeHtml(row.sourceFile || "-")}</div>
+          <div style="margin-top:10px;"><b>机理：</b>${escapeHtml(row["机理"] || "-")}</div>
+          <div style="margin-top:10px;"><b>建议：</b>${escapeHtml(row["建议"] || "-")}</div>
+          <div style="margin-top:10px;"><b>不维修可能后果：</b>${escapeHtml(row["不维修可能后果"] || "-")}</div>
           <div style="margin-top:10px;"><b>健康趋势图</b></div>
           <div>${trendSvg || "<div class='admin-empty'>无</div>"}</div>
           <div style="margin-top:10px;"><b>震动频谱图</b></div>
           <div>${fftSvg || "<div class='admin-empty'>无</div>"}</div>
           <div style="margin-top:10px;"><b>综合维护报告文本</b></div>
-          <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e4e8ef;border-radius:8px;padding:8px;">${escapeHtml(
-            row["综合维护报告"] || "-"
-          )}</pre>
+          <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e4e8ef;border-radius:8px;padding:8px;">${escapeHtml(fullReport)}</pre>
         </div>
       `;
     }

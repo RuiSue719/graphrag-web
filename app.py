@@ -2935,7 +2935,75 @@ def intelligent_decision_export_maintenance_report(record_id: int):
         return jsonify({"error": "记录不存在或无权限访问。"}), 404
     report_md = str(row["report_markdown"] or "").strip()
     if not report_md:
-        return jsonify({"error": "该记录暂无综合维护报告。"}), 400
+        # 先尝试按记录信息实时补算一次 RUL/报告；失败时再降级为兜底文本。
+        try:
+            ds = str(row["source_dataset"] or "").strip().upper()
+            file_path = str(row["source_file"] or "").strip()
+            if ds in {"CWRU", "MFPT"} and file_path and np is not None:
+                root = DIAG_DATASET_ROOTS.get(ds)
+                if root:
+                    root_resolved = root.resolve()
+                    target = (root_resolved / file_path).resolve()
+                    if str(target).startswith(str(root_resolved)) and target.exists() and target.is_file():
+                        raw_signal = diag_load_signal_from_mat(target)
+                        normalized = diag_normalize_signal(raw_signal)
+                        signal = [float(v) for v in normalized[:512]]
+                        fft = [float(v) for v in np.abs(np.fft.rfft(normalized))[:256]]
+                        report_obj = build_cnn_lstm_trend_and_rul(
+                            ds,
+                            signal,
+                            str(row["fault_name"] or ""),
+                            float(row["confidence"] or 0.0),
+                        )
+                        report_md = build_maintenance_report_text(report_obj, "数控机床主轴轴承", file_path)
+                        rul_hours = float(report_obj.get("rulHours", 0.0) or 0.0)
+                        status_risk = f"{report_obj.get('statusEvaluation', '')} 风险等级：{report_obj.get('riskLevel', '-')}".strip()
+                        trend_svg = _build_simple_svg_line(
+                            [float(v) for v in report_obj.get("healthSeries", [])],
+                            color="#2f6fed",
+                            x_label="时间窗口 (step)",
+                            y_label="健康度",
+                            y_unit="%",
+                        )
+                        fft_svg = _build_simple_svg_line(
+                            [float(v) for v in fft],
+                            color="#d64f4f",
+                            x_label="频率点 (bin)",
+                            y_label="振动幅值",
+                            y_unit="a.u.",
+                        )
+                        with _db_connect() as conn:
+                            conn.execute(
+                                """
+                                UPDATE intelligent_decision_records
+                                SET rul_hours = ?, status_risk = ?, trend_svg = ?, fft_svg = ?, report_markdown = ?, updated_at = ?
+                                WHERE id = ?
+                                """,
+                                (rul_hours, status_risk, trend_svg, fft_svg, report_md, _utc_now_iso(), record_id),
+                            )
+                            conn.commit()
+        except Exception:
+            pass
+
+    if not report_md:
+        report_md = (
+            "# 数控机床故障综合维护报告\n\n"
+            "## 1. 记录信息\n"
+            f"- 故障名称：{row['fault_name'] or '-'}\n"
+            f"- 诊断置信度：{round(float(row['confidence'] or 0.0), 2)}%\n"
+            f"- 风险等级：{row['risk_level'] or '-'}\n"
+            f"- RUL：{round(float(row['rul_hours'] or 0.0), 2)} 小时\n"
+            f"- 状态评估与风险等级：{row['status_risk'] or '-'}\n"
+            f"- 数据集：{row['source_dataset'] or '-'}\n"
+            f"- 模型：{row['source_model'] or '-'}\n"
+            f"- 样本文件：{row['source_file'] or '-'}\n\n"
+            "## 2. 机理\n"
+            f"{row['mechanism'] or '-'}\n\n"
+            "## 3. 维护建议\n"
+            f"{row['suggestions'] or '-'}\n\n"
+            "## 4. 不维修可能后果\n"
+            f"{row['consequence'] or '-'}\n"
+        )
     filename = f"综合维护报告_{record_id}.md"
     resp = Response(report_md, mimetype="text/markdown; charset=utf-8")
     resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{requests.utils.quote(filename)}"
