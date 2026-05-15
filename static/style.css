@@ -1286,7 +1286,7 @@ body {
 }
 
 .decision-toolbar {
-  grid-template-columns: 98px minmax(160px, 1fr) minmax(240px, 2fr) 68px 68px;
+  grid-template-columns: 98px 130px minmax(220px, 1fr) 68px 68px;
 }
 
 #decisionAddBtn,
@@ -1296,10 +1296,6 @@ body {
   height: 36px;
   padding: 0 10px;
   font-size: 13px;
-}
-
-.decision-toolbar-spacer {
-  min-height: 1px;
 }
 
 .decision-create-toolbar {
@@ -1517,17 +1513,33 @@ body {
 }
 
 .diag-card.active {
-  border-color: #5f82cf;
-  background: linear-gradient(180deg, #d8e5ff, #bfd3ff);
-  box-shadow: 0 0 0 2px rgba(73, 110, 197, 0.28);
+  border-color: #3564c6;
+  background: linear-gradient(180deg, #7ea6ff, #4f7fe6);
+  box-shadow: 0 0 0 2px rgba(53, 100, 198, 0.3);
+  color: #ffffff;
   transform: translateY(-1px);
 }
 
 .diag-card[data-active="true"] {
-  border-color: #5f82cf;
-  background: linear-gradient(180deg, #d8e5ff, #bfd3ff);
-  box-shadow: 0 0 0 2px rgba(73, 110, 197, 0.28);
+  border-color: #3564c6;
+  background: linear-gradient(180deg, #7ea6ff, #4f7fe6);
+  box-shadow: 0 0 0 2px rgba(53, 100, 198, 0.3);
+  color: #ffffff;
   transform: translateY(-1px);
+}
+
+.diag-card[aria-pressed="true"] {
+  border-color: #3564c6;
+  background: linear-gradient(180deg, #7ea6ff, #4f7fe6);
+  box-shadow: 0 0 0 2px rgba(53, 100, 198, 0.3);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.diag-card.active .diag-card-desc,
+.diag-card[data-active="true"] .diag-card-desc,
+.diag-card[aria-pressed="true"] .diag-card-desc {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .diag-card-title {
@@ -1573,17 +1585,24 @@ body {
 }
 
 .diag-seg.active {
-  border-color: #4f75c8;
-  background: linear-gradient(180deg, #d4e2ff, #b7cbfb);
-  box-shadow: 0 0 0 2px rgba(70, 105, 190, 0.28);
-  color: #233f70;
+  border-color: #2f60c6;
+  background: linear-gradient(180deg, #6a93f5, #3569d8);
+  box-shadow: 0 0 0 2px rgba(47, 96, 198, 0.3);
+  color: #ffffff;
 }
 
 .diag-seg[data-active="true"] {
-  border-color: #4f75c8;
-  background: linear-gradient(180deg, #d4e2ff, #b7cbfb);
-  box-shadow: 0 0 0 2px rgba(70, 105, 190, 0.28);
-  color: #233f70;
+  border-color: #2f60c6;
+  background: linear-gradient(180deg, #6a93f5, #3569d8);
+  box-shadow: 0 0 0 2px rgba(47, 96, 198, 0.3);
+  color: #ffffff;
+}
+
+.diag-seg[aria-pressed="true"] {
+  border-color: #2f60c6;
+  background: linear-gradient(180deg, #6a93f5, #3569d8);
+  box-shadow: 0 0 0 2px rgba(47, 96, 198, 0.3);
+  color: #ffffff;
 }
 
 .diag-model-tip {

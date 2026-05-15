@@ -2625,6 +2625,7 @@ def intelligent_decisions():
     page = max(1, request.args.get("page", default=1, type=int))
     page_size = min(100, max(1, request.args.get("pageSize", default=10, type=int)))
     keyword = (request.args.get("keyword") or "").strip()
+    field = (request.args.get("field") or "all").strip().lower()
     scope = _decision_scope_where_sql()
 
     where_parts: List[str] = []
@@ -2633,9 +2634,25 @@ def intelligent_decisions():
         where_parts.append(scope["sql"])
         where_args.extend(scope["args"])
     if keyword:
-        where_parts.append("(fault_name LIKE ? OR mechanism LIKE ? OR suggestions LIKE ? OR consequence LIKE ?)")
         like_kw = f"%{keyword}%"
-        where_args.extend([like_kw, like_kw, like_kw, like_kw])
+        if field == "fault":
+            where_parts.append("fault_name LIKE ?")
+            where_args.append(like_kw)
+        elif field == "mechanism":
+            where_parts.append("mechanism LIKE ?")
+            where_args.append(like_kw)
+        elif field == "suggestions":
+            where_parts.append("suggestions LIKE ?")
+            where_args.append(like_kw)
+        elif field == "consequence":
+            where_parts.append("consequence LIKE ?")
+            where_args.append(like_kw)
+        elif field == "risk":
+            where_parts.append("(risk_level LIKE ? OR status_risk LIKE ?)")
+            where_args.extend([like_kw, like_kw])
+        else:
+            where_parts.append("(fault_name LIKE ? OR mechanism LIKE ? OR suggestions LIKE ? OR consequence LIKE ?)")
+            where_args.extend([like_kw, like_kw, like_kw, like_kw])
     where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
     offset = (page - 1) * page_size
 
@@ -2724,6 +2741,7 @@ def intelligent_decision_from_diagnosis():
     dataset = str(payload.get("dataset", "") or "").strip()
     model = str(payload.get("model", "") or "").strip()
     file_path = str(payload.get("filePath", "") or "").strip()
+    build_report = bool(payload.get("buildReport", False))
     signal = payload.get("signal") or []
     fft = payload.get("fft") or []
     try:
@@ -2749,7 +2767,7 @@ def intelligent_decision_from_diagnosis():
     report_md = ""
     rul_hours = 0.0
     status_risk = built.get("risk_level", "")
-    if dataset in {"CWRU", "MFPT"} and isinstance(signal, list) and signal:
+    if build_report and dataset in {"CWRU", "MFPT"} and isinstance(signal, list) and signal:
         try:
             report_obj = build_cnn_lstm_trend_and_rul(dataset, signal, prediction, confidence)
             rul_hours = float(report_obj.get("rulHours", 0.0) or 0.0)

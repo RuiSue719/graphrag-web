@@ -329,7 +329,14 @@
       <section class="admin-case-card">
         <div class="case-toolbar decision-toolbar">
           <button id="decisionAddBtn" class="rect-primary-btn" type="button">添加记录</button>
-          <div class="decision-toolbar-spacer"></div>
+          <select id="decisionFieldFilter" class="case-input">
+            <option value="all">全部列</option>
+            <option value="fault">故障名称</option>
+            <option value="mechanism">机理</option>
+            <option value="suggestions">建议</option>
+            <option value="consequence">不维修后果</option>
+            <option value="risk">风险相关</option>
+          </select>
           <input id="decisionSearchInput" class="case-input" type="text" placeholder="搜索故障名称/机理/建议/后果" />
           <button id="decisionSearchBtn" class="ghost-btn" type="button">搜索</button>
           <button id="decisionResetBtn" class="ghost-btn" type="button">重置</button>

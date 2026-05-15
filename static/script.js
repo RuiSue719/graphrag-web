@@ -133,6 +133,7 @@ const decisionGenerateBtn = document.getElementById("decisionGenerateBtn");
 const decisionAddBtn = document.getElementById("decisionAddBtn");
 const decisionCreateBlock = document.getElementById("decisionCreateBlock");
 const decisionCreateCancelBtn = document.getElementById("decisionCreateCancelBtn");
+const decisionFieldFilter = document.getElementById("decisionFieldFilter");
 const decisionSearchInput = document.getElementById("decisionSearchInput");
 const decisionSearchBtn = document.getElementById("decisionSearchBtn");
 const decisionResetBtn = document.getElementById("decisionResetBtn");
@@ -220,6 +221,7 @@ const decisionState = {
   total: 0,
   pages: 1,
   keyword: "",
+  searchField: "all",
 };
 const decisionModalState = {
   mode: "detail",
@@ -1000,11 +1002,15 @@ async function loadDecisionModule() {
   decisionTableWrap.innerHTML = "<div class='admin-empty'>正在加载智能决策记录...</div>";
   toggleDecisionCreateBlock(false);
   setDecisionMessage("");
+  if (decisionFieldFilter) {
+    decisionFieldFilter.value = decisionState.searchField || "all";
+  }
   try {
     const params = new URLSearchParams({
       page: String(decisionState.page),
       pageSize: String(decisionState.pageSize),
       keyword: decisionState.keyword || "",
+      field: decisionState.searchField || "all",
     });
     const res = await fetch(`/api/intelligent-decisions?${params.toString()}`);
     if (res.status === 401) {
@@ -1278,8 +1284,9 @@ async function saveDiagToDecision() {
         dataset: result.dataset || diagState.dataset || "",
         model: result.modelCanonical || result.model || diagState.model || "",
         filePath: result.filePath || diagState.filePath || "",
-        signal: Array.isArray(result.signal) ? result.signal : [],
-        fft: Array.isArray(result.fft) ? result.fft : [],
+        buildReport: false,
+        signal: [],
+        fft: [],
       }),
     });
     const data = await res.json();
@@ -2771,21 +2778,30 @@ decisionCreateCancelBtn?.addEventListener("click", () => {
 });
 decisionSearchBtn?.addEventListener("click", async () => {
   decisionState.keyword = (decisionSearchInput?.value || "").trim();
+  decisionState.searchField = decisionFieldFilter?.value || "all";
   decisionState.page = 1;
   await loadDecisionModule();
 });
 decisionResetBtn?.addEventListener("click", async () => {
   decisionState.keyword = "";
+  decisionState.searchField = "all";
   decisionState.page = 1;
   if (decisionSearchInput) decisionSearchInput.value = "";
+  if (decisionFieldFilter) decisionFieldFilter.value = "all";
   await loadDecisionModule();
 });
 decisionSearchInput?.addEventListener("keydown", async (e) => {
   if (e.key === "Enter") {
     decisionState.keyword = (decisionSearchInput?.value || "").trim();
+    decisionState.searchField = decisionFieldFilter?.value || "all";
     decisionState.page = 1;
     await loadDecisionModule();
   }
+});
+decisionFieldFilter?.addEventListener("change", async () => {
+  decisionState.searchField = decisionFieldFilter.value || "all";
+  decisionState.page = 1;
+  await loadDecisionModule();
 });
 decisionModalCloseBtn?.addEventListener("click", closeDecisionModal);
 decisionModalSaveBtn?.addEventListener("click", saveDecisionModal);
