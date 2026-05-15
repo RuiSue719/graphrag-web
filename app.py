@@ -3,6 +3,7 @@ import re
 import os
 import time
 import csv
+import json
 import math
 import hashlib
 import sqlite3
@@ -779,6 +780,8 @@ class CloudLLMService:
         ]
 
         selected_model = (model or self.default_model or "Qwen/Qwen3-8B").strip()
+        if "qwen" not in selected_model.lower():
+            selected_model = self.default_model or "Qwen/Qwen3-8B"
         payload = {
             "model": selected_model,
             "messages": messages,
@@ -1102,6 +1105,28 @@ def init_user_db() -> None:
                 created_by TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS maintenance_report_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_name TEXT NOT NULL,
+                dataset TEXT NOT NULL,
+                model_name TEXT NOT NULL,
+                sample_file TEXT NOT NULL,
+                diagnosis_label TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0,
+                risk_level TEXT NOT NULL,
+                health_score REAL NOT NULL DEFAULT 0,
+                rul_hours REAL NOT NULL DEFAULT 0,
+                status_eval TEXT NOT NULL,
+                advice_text TEXT NOT NULL,
+                trend_points_json TEXT NOT NULL,
+                fft_points_json TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL
             )
             """
         )
@@ -1761,6 +1786,186 @@ def diag_infer(dataset: str, model_canonical: str, file_path: str) -> Dict[str, 
     }
 
 
+def _risk_level_by_health_score(score: float) -> str:
+    if score >= 80:
+        return "低风险"
+    if score >= 60:
+        return "中风险"
+    if score >= 40:
+        return "较高风险"
+    return "高风险"
+
+
+def _status_eval_by_health_score(score: float) -> str:
+    if score >= 80:
+        return "设备健康状态良好，退化趋势平稳。"
+    if score >= 60:
+        return "设备处于可用状态，存在轻微退化趋势，建议加强监测。"
+    if score >= 40:
+        return "设备退化较明显，建议尽快安排预防性维护。"
+    return "设备退化严重，建议立即检修并评估停机风险。"
+
+
+def _build_simple_svg_line(points: List[float], width: int = 760, height: int = 220, color: str = "#2f6fed") -> str:
+    if not points:
+        points = [0.0, 0.0]
+    n = len(points)
+    min_v = min(points)
+    max_v = max(points)
+    span = max(max_v - min_v, 1e-8)
+    coords: List[str] = []
+    for i, v in enumerate(points):
+        x = 20 + (i / max(1, n - 1)) * (width - 40)
+        y = 15 + (1.0 - (v - min_v) / span) * (height - 30)
+        coords.append(f"{x:.2f},{y:.2f}")
+    pts = " ".join(coords)
+    return (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' viewBox='0 0 {width} {height}'>"
+        "<rect x='0' y='0' width='100%' height='100%' fill='#ffffff'/>"
+        f"<polyline fill='none' stroke='{color}' stroke-width='2' points='{pts}'/>"
+        "</svg>"
+    )
+
+
+def build_cnn_lstm_trend_and_rul(
+    dataset: str,
+    signal: List[float],
+    prediction: str,
+    confidence: float,
+) -> Dict[str, Any]:
+    if np is None or torch is None:
+        raise RuntimeError("缺少 numpy/torch 依赖，无法进行趋势与RUL计算。")
+    x = np.asarray(signal, dtype=np.float32)
+    if x.size < 256:
+        x = np.pad(x, (0, 256 - x.size), mode="edge")
+
+    # 基于CNN-LSTM分类器做滑窗序列推理，构建“健康度-时间”趋势。
+    model = diag_resolve_model(dataset, "CNN-LSTM")
+    labels = DIAG_CLASS_NAMES[dataset]
+    normal_idx = 0
+    if labels and labels[0] != "正常":
+        for i, lb in enumerate(labels):
+            if "正常" in str(lb):
+                normal_idx = i
+                break
+
+    win = 256
+    stride = 32
+    health_series: List[float] = []
+    with torch.no_grad():
+        for start in range(0, max(1, x.size - win + 1), stride):
+            seg = x[start : start + win]
+            if seg.size < win:
+                seg = np.pad(seg, (0, win - seg.size), mode="edge")
+            seg = diag_normalize_signal(seg)
+            tensor = torch.from_numpy(seg).float().unsqueeze(0).unsqueeze(0)
+            logits = model(tensor)
+            probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
+            p_normal = float(probs[normal_idx]) if normal_idx < len(probs) else float(np.max(probs))
+            health_series.append(max(0.0, min(100.0, p_normal * 100.0)))
+
+    if len(health_series) < 2:
+        health_series = health_series + [health_series[-1] if health_series else 50.0]
+    health_now = float(health_series[-1])
+    slope = float((health_series[-1] - health_series[0]) / max(1, len(health_series) - 1))
+    degrade_speed = max(0.2, -slope)
+    rul_steps = max(1.0, health_now / degrade_speed)
+    rul_hours = round(rul_steps * 0.5, 1)
+
+    risk_level = _risk_level_by_health_score(health_now)
+    status_eval = _status_eval_by_health_score(health_now)
+    suggestion = (
+        "建议保持润滑状态巡检、复测振动包络与温升趋势。"
+        if health_now >= 60
+        else "建议在最近一个维护窗口完成轴承检查与对中校验；若温升持续，请提前备件并安排停机维护。"
+    )
+    return {
+        "dataset": dataset,
+        "model": "CNN-LSTM",
+        "prediction": prediction,
+        "confidence": round(float(confidence) * 100.0 if confidence <= 1 else float(confidence), 2),
+        "healthSeries": [round(float(v), 2) for v in health_series],
+        "healthScore": round(health_now, 2),
+        "rulHours": rul_hours,
+        "riskLevel": risk_level,
+        "statusEvaluation": status_eval,
+        "maintenanceAdvice": suggestion,
+    }
+
+
+def build_maintenance_report_text(report: Dict[str, Any], equipment_name: str, sample_file: str) -> str:
+    return (
+        "# 数控机床故障综合维护报告\n\n"
+        "## 1. 设备信息\n"
+        f"- 设备名称：{equipment_name}\n"
+        f"- 数据集：{report.get('dataset', '-')}\n"
+        f"- 分析模型：{report.get('model', '-')}\n"
+        f"- 样本文件：{sample_file or '-'}\n\n"
+        "## 2. 诊断与健康评估\n"
+        f"- 故障诊断结论：{report.get('prediction', '-')}\n"
+        f"- 诊断置信度：{report.get('confidence', 0)}%\n"
+        f"- 当前健康评分：{report.get('healthScore', 0)} / 100\n"
+        f"- 健康状态评估：{report.get('statusEvaluation', '-')}\n"
+        f"- 风险等级：{report.get('riskLevel', '-')}\n\n"
+        "## 3. 剩余寿命预测（RUL）\n"
+        f"- 预测剩余使用寿命：{report.get('rulHours', 0)} 小时\n\n"
+        "## 4. 维护建议\n"
+        f"{report.get('maintenanceAdvice', '-')}\n"
+    )
+
+
+def build_maintenance_report_html(
+    report: Dict[str, Any],
+    equipment_name: str,
+    sample_file: str,
+    trend_points: List[float],
+    fft_points: List[float],
+) -> str:
+    trend_svg = _build_simple_svg_line(trend_points, color="#2f6fed")
+    fft_svg = _build_simple_svg_line(fft_points[:256], color="#d64f4f")
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>数控机床故障综合维护报告</title>
+  <style>
+    body{{font-family:Segoe UI,Microsoft YaHei,sans-serif;background:#f6f8fc;color:#1f2a44;margin:0;padding:20px;}}
+    .card{{max-width:980px;margin:0 auto;background:#fff;border:1px solid #dfe6f5;border-radius:12px;padding:18px;}}
+    h1{{margin:0 0 12px 0;font-size:28px;}} h2{{margin:16px 0 8px 0;font-size:20px;}}
+    .grid{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}} .item{{background:#f7faff;border:1px solid #e3ebfb;border-radius:8px;padding:10px;}}
+    .risk{{display:inline-block;padding:4px 10px;border-radius:999px;background:#fff1f1;color:#b63f3f;border:1px solid #f0c3c3;}}
+    .plot{{margin-top:8px;border:1px solid #e5ebfa;border-radius:10px;padding:8px;background:#fff;}}
+    .foot{{color:#5d6f92;font-size:12px;margin-top:14px;}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>数控机床故障综合维护报告</h1>
+    <div class="grid">
+      <div class="item">设备名称：{equipment_name}</div>
+      <div class="item">分析模型：{report.get('model', '-')}</div>
+      <div class="item">数据集：{report.get('dataset', '-')}</div>
+      <div class="item">样本文件：{sample_file or '-'}</div>
+      <div class="item">故障诊断：{report.get('prediction', '-')}</div>
+      <div class="item">置信度：{report.get('confidence', 0)}%</div>
+      <div class="item">健康评分：{report.get('healthScore', 0)} / 100</div>
+      <div class="item">RUL：{report.get('rulHours', 0)} 小时</div>
+    </div>
+    <h2>状态评估与风险等级</h2>
+    <p>{report.get('statusEvaluation', '-')}</p>
+    <p><span class="risk">{report.get('riskLevel', '-')}</span></p>
+    <h2>健康趋势曲线（CNN-LSTM）</h2>
+    <div class="plot">{trend_svg}</div>
+    <h2>振动频谱图</h2>
+    <div class="plot">{fft_svg}</div>
+    <h2>维护建议</h2>
+    <p>{report.get('maintenanceAdvice', '-')}</p>
+    <div class="foot">生成时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
+  </div>
+</body>
+</html>"""
+
+
 def load_diag_model_tips() -> Dict[str, str]:
     tips = dict(DIAG_MODEL_TIPS_DEFAULT)
     if not NETWORK_FEATURE_PATH.exists():
@@ -1823,6 +2028,42 @@ def detect_query_intent(query: str, graph_node: str = "") -> str:
     if len(q) <= 8 and not re.search(r"故障|异常|报警|温度|振动", q):
         return "casual"
     return "fault"
+
+
+def encode_query_packet(query: str, graph_node: str = "") -> Dict[str, Any]:
+    q = (query or "").strip()
+    tokens_cn = re.findall(r"[\u4e00-\u9fff]{1,8}", q)
+    tokens_en = re.findall(r"[a-zA-Z0-9_\-\.]{2,}", q)
+    return {
+        "query": q,
+        "graphNode": (graph_node or "").strip(),
+        "length": len(q),
+        "tokens": (tokens_cn + tokens_en)[:18],
+        "intent": detect_query_intent(q, graph_node=graph_node),
+    }
+
+
+def select_tools_by_packet(packet: Dict[str, Any], request_mode: str = "") -> Dict[str, Any]:
+    intent = str(packet.get("intent") or "fault")
+    node = str(packet.get("graphNode") or "")
+    mode = (request_mode or "").strip().lower()
+    use_kg_query = bool(node or intent == "fault")
+    use_kb_retrieve = bool(intent == "fault")
+    use_pattern_match = bool(mode == "kg-auto" or len(packet.get("tokens") or []) > 0)
+    return {
+        "useKgQuery": use_kg_query,
+        "useKbRetrieve": use_kb_retrieve,
+        "usePatternMatch": use_pattern_match,
+    }
+
+
+def build_llm_instruction_by_mode(request_mode: str, graph_node: str = "") -> str:
+    mode = (request_mode or "").strip().lower()
+    if mode == "kg-auto":
+        return "你是数控机床故障诊断助手。只输出最终结论，不要展示推理过程。"
+    if graph_node:
+        return "你是数控机床维护助手。回答控制在100字内，必须给出可执行建议。"
+    return "你是工业设备故障问答助手。优先依据给定上下文，输出简洁且可执行的答案。"
 
 
 def hybrid_kb_retrieve(query: str, focus_terms: Optional[List[str]] = None, top_k: int = 8) -> List[Dict[str, Any]]:
@@ -2713,6 +2954,80 @@ def diag_infer_api():
         return jsonify({"error": str(exc)}), 400
 
 
+@app.post("/api/maintenance-reports/generate")
+def generate_maintenance_report():
+    payload = request.get_json(silent=True) or {}
+    dataset = str(payload.get("dataset", "") or "").strip().upper()
+    prediction = str(payload.get("prediction", "") or "").strip()
+    model_name = str(payload.get("model", "") or "").strip()
+    sample_file = str(payload.get("filePath", "") or "").strip()
+    equipment_name = str(payload.get("equipmentName", "") or "数控机床主轴轴承").strip()
+    confidence_raw = payload.get("confidence", 0)
+    signal = payload.get("signal") or []
+    fft = payload.get("fft") or []
+    if dataset not in {"CWRU", "MFPT"}:
+        return jsonify({"error": "dataset 参数无效，仅支持 CWRU/MFPT。"}), 400
+    if not prediction:
+        return jsonify({"error": "缺少诊断结果 prediction。"}), 400
+    if not isinstance(signal, list) or len(signal) == 0:
+        return jsonify({"error": "缺少振动信号 signal。"}), 400
+    try:
+        confidence = float(confidence_raw)
+    except Exception:
+        confidence = 0.0
+    try:
+        report = build_cnn_lstm_trend_and_rul(dataset, signal, prediction, confidence)
+    except Exception as exc:
+        return jsonify({"error": f"报告计算失败：{str(exc)}"}), 400
+
+    trend_points = report.get("healthSeries", [])
+    fft_points = [float(v) for v in fft[:256]] if isinstance(fft, list) else []
+    md_text = build_maintenance_report_text(report, equipment_name, sample_file)
+    html_text = build_maintenance_report_html(report, equipment_name, sample_file, trend_points, fft_points)
+
+    now = _utc_now_iso()
+    created_by = (session.get("username") or "").strip() or "unknown"
+    with _db_connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO maintenance_report_records (
+                equipment_name, dataset, model_name, sample_file, diagnosis_label,
+                confidence, risk_level, health_score, rul_hours, status_eval, advice_text,
+                trend_points_json, fft_points_json, created_by, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                equipment_name,
+                dataset,
+                model_name or "CNN-LSTM",
+                sample_file,
+                prediction,
+                report.get("confidence", 0),
+                report.get("riskLevel", "-"),
+                report.get("healthScore", 0),
+                report.get("rulHours", 0),
+                report.get("statusEvaluation", ""),
+                report.get("maintenanceAdvice", ""),
+                json.dumps(trend_points, ensure_ascii=False),
+                json.dumps(fft_points, ensure_ascii=False),
+                created_by,
+                now,
+            ),
+        )
+        record_id = int(cur.lastrowid or 0)
+        conn.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "recordId": record_id,
+            "report": report,
+            "markdown": md_text,
+            "html": html_text,
+        }
+    )
+
+
 @app.get("/api/faqs")
 def get_faqs():
     count = request.args.get("count", default=3, type=int)
@@ -2816,7 +3131,10 @@ def chat():
     if image_name and not query:
         return jsonify(kb.answer(query, image_name=image_name))
 
-    intent = detect_query_intent(query, graph_node=graph_node)
+    request_mode = (payload.get("requestMode") or "").strip().lower()
+    encoder_packet = encode_query_packet(query, graph_node=graph_node)
+    intent = encoder_packet["intent"]
+    tool_plan = select_tools_by_packet(encoder_packet, request_mode=request_mode)
     if intent == "casual" and query and not graph_node:
         plain_text = cloud_llm.chat(
             f"用户问题：{query}\n请直接回答，语气自然，控制在120字以内。",
@@ -2831,6 +3149,12 @@ def chat():
                 "sources": [],
                 "evidence": {
                     "intent": "casual",
+                    "pipeline": {
+                        "encoder": encoder_packet,
+                        "toolSelector": tool_plan,
+                        "instruction": "通用闲聊问答",
+                        "contextCount": 0,
+                    },
                     "kb": [],
                     "kg": [],
                     "llm": {
@@ -2846,8 +3170,8 @@ def chat():
         )
 
     focus_terms = [term for term in [graph_node] if term]
-    exact_csv_hits = kb.exact_csv_matches(graph_node or query, top_k=3)
-    kb_hits_all = hybrid_kb_retrieve(query, focus_terms=focus_terms, top_k=10) if query else []
+    exact_csv_hits = kb.exact_csv_matches(graph_node or query, top_k=3) if tool_plan["usePatternMatch"] else []
+    kb_hits_all = hybrid_kb_retrieve(query, focus_terms=focus_terms, top_k=10) if (query and tool_plan["useKbRetrieve"]) else []
     kb_hits = exact_csv_hits + [
         it for it in kb_hits_all if str(it.get("source", "")).startswith("csv:") or it.get("source") == QA_ONLY_SOURCE
     ]
@@ -2868,7 +3192,7 @@ def chat():
             if isinstance(t, dict) and (t.get("head") or t.get("rel") or t.get("tail"))
         ][:8]
     else:
-        kg_hits = neo4j_service.search_triplets(graph_node or query, limit=8) if (graph_node or query) else []
+        kg_hits = neo4j_service.search_triplets(graph_node or query, limit=8) if (tool_plan["useKgQuery"] and (graph_node or query)) else []
 
     context_blocks = []
     if kg_hits:
@@ -2899,12 +3223,7 @@ def chat():
     request_mode = (payload.get("requestMode") or "").strip().lower()
     is_kg_auto_mode = request_mode == "kg-auto"
     is_citation_mode = bool(graph_node) and request_mode != "kg-auto"
-    if is_kg_auto_mode:
-        prompt_head = "你是数控机床故障诊断助手。只输出最终结论，不要分析过程。"
-    elif is_citation_mode:
-        prompt_head = "你是数控机床维护助手。必须在100字内给出完整结论，不要输出推理过程。"
-    else:
-        prompt_head = "你是工业设备故障问答助手。优先基于提供的上下文，结论简洁、可执行。"
+    prompt_head = build_llm_instruction_by_mode(request_mode, graph_node=graph_node)
 
     llm_num_predict = 220 if is_citation_mode else (256 if is_kg_auto_mode else 320)
     llm_timeout = 180 if is_citation_mode else (180 if is_kg_auto_mode else None)
@@ -2977,6 +3296,12 @@ def chat():
 
     evidence = {
         "intent": "fault",
+        "pipeline": {
+            "encoder": encoder_packet,
+            "toolSelector": tool_plan,
+            "instruction": prompt_head,
+            "contextCount": len(context_blocks),
+        },
         "retrieval": {
             "mode": "kg_then_rag",
             "chromaAvailable": chroma_retriever.available,

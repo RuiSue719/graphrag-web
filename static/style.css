@@ -1,7 +1,7 @@
 :root {
-  --bg-main: #f3f6fb;
+  --bg-main: #ffffff;
   --bg-card: #ffffff;
-  --bg-soft: #eef3ff;
+  --bg-soft: #f7f7f7;
   --text-main: #172033;
   --text-sub: #647087;
   --line: #e0e6f1;
@@ -21,10 +21,7 @@ body {
   font-family: "Noto Sans SC", sans-serif;
   height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 15% 10%, rgba(57, 99, 255, 0.15), transparent 32%),
-    radial-gradient(circle at 85% 18%, rgba(16, 177, 158, 0.12), transparent 28%),
-    linear-gradient(180deg, #f8fbff 0%, var(--bg-main) 100%);
+  background: #ffffff;
 }
 
 .app-shell {
@@ -33,7 +30,7 @@ body {
   height: calc(100vh - 36px);
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
   box-shadow: var(--shadow);
   display: grid;
   grid-template-rows: 1fr;
@@ -53,7 +50,7 @@ body {
   grid-column: 1;
   border-right: 1px solid var(--line);
   padding: 12px;
-  background: linear-gradient(180deg, #f6f9ff 0%, #ecf2ff 100%);
+  background: #ffffff;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -94,7 +91,7 @@ body {
 
 .col-splitter {
   cursor: col-resize;
-  background: linear-gradient(180deg, #edf2ff 0%, #dde8ff 100%);
+  background: #f7f7f7;
   border-left: 1px solid #d6e2fb;
   border-right: 1px solid #d6e2fb;
 }
@@ -124,7 +121,7 @@ body {
   grid-column: 3;
   border-right: 1px solid var(--line);
   padding: 12px;
-  background: linear-gradient(180deg, #f4f8ff 0%, #edf3ff 100%);
+  background: #ffffff;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -186,7 +183,7 @@ body {
   align-items: center;
   padding: 14px 20px;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+  background: #ffffff;
 }
 
 .topbar-right {

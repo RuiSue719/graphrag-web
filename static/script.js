@@ -130,6 +130,7 @@ const diagSaveDecisionMsg = document.getElementById("diagSaveDecisionMsg");
 const decisionFaultInput = document.getElementById("decisionFaultInput");
 const decisionConfidenceInput = document.getElementById("decisionConfidenceInput");
 const decisionGenerateBtn = document.getElementById("decisionGenerateBtn");
+const decisionGenerateMaintReportBtn = document.getElementById("decisionGenerateMaintReportBtn");
 const decisionSearchInput = document.getElementById("decisionSearchInput");
 const decisionSearchBtn = document.getElementById("decisionSearchBtn");
 const decisionResetBtn = document.getElementById("decisionResetBtn");
@@ -1248,6 +1249,47 @@ async function saveDiagToDecision() {
     if (diagSaveDecisionMsg) {
       diagSaveDecisionMsg.textContent = e.message || "保存失败";
     }
+  }
+}
+
+async function generateMaintenanceReportFromDiag() {
+  if (!diagState.lastInference) {
+    setDecisionMessage("请先在“数据诊断”模块完成一次诊断，再生成综合维护报告。");
+    return;
+  }
+  const result = diagState.lastInference;
+  setDecisionMessage("正在生成综合维护报告...");
+  try {
+    const res = await fetch("/api/maintenance-reports/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        equipmentName: "数控机床主轴轴承",
+        dataset: result.dataset || diagState.dataset || "",
+        model: result.modelCanonical || result.model || diagState.model || "CNN-LSTM",
+        filePath: result.filePath || diagState.filePath || "",
+        prediction: result.prediction || "",
+        confidence: result.confidence || 0,
+        signal: Array.isArray(result.signal) ? result.signal : [],
+        fft: Array.isArray(result.fft) ? result.fft : [],
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "生成失败");
+
+    const html = String(data.html || "");
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `数控机床综合维护报告_${data.recordId || Date.now()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setDecisionMessage(`报告生成成功，风险等级：${data.report?.riskLevel || "-"}，RUL：${data.report?.rulHours || 0} 小时`);
+  } catch (e) {
+    setDecisionMessage(e.message || "综合维护报告生成失败");
   }
 }
 
@@ -2679,6 +2721,7 @@ caseSourceFilter?.addEventListener("change", async () => {
   await loadAdminCaseModule();
 });
 decisionGenerateBtn?.addEventListener("click", generateDecisionByInput);
+decisionGenerateMaintReportBtn?.addEventListener("click", generateMaintenanceReportFromDiag);
 decisionSearchBtn?.addEventListener("click", async () => {
   decisionState.keyword = (decisionSearchInput?.value || "").trim();
   decisionState.page = 1;
