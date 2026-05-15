@@ -1249,6 +1249,29 @@ body {
   min-height: 180px;
 }
 
+/* 添加记录弹窗使用独立网格，避免复用详情网格区域导致字段重叠 */
+#decisionCreateModal .decision-create-form-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  grid-template-areas: none !important;
+}
+
+#decisionCreateModal .decision-create-form-grid > label {
+  grid-area: auto !important;
+  line-height: 1.45;
+}
+
+#decisionCreateModal .decision-create-form-grid .decision-mechanism,
+#decisionCreateModal .decision-create-form-grid .decision-suggestions,
+#decisionCreateModal .decision-create-form-grid .decision-consequence {
+  grid-column: span 1;
+}
+
+@media (max-width: 980px) {
+  #decisionCreateModal .decision-create-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .profile-form-grid input[readonly] {
   background: #f2f6ff;
   color: #667b9f;

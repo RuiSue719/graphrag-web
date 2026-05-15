@@ -4,6 +4,7 @@ import os
 import time
 import csv
 import json
+import html
 import math
 import hashlib
 import sqlite3
@@ -3335,6 +3336,10 @@ def intelligent_decision_export_maintenance_report(record_id: int):
                 model_name=str(row["source_model"] or "CNN-LSTM"),
             )
             report_md = str(quick["report_md"] or report_md)
+            trend_svg = str(quick["trend_svg"] or trend_svg)
+            fft_svg = str(quick["fft_svg"] or fft_svg)
+            rul_hours = float(quick["rul_hours"] or row["rul_hours"] or 0.0)
+            status_risk = str(quick["status_risk"] or row["status_risk"] or "")
             with _db_connect() as conn:
                 conn.execute(
                     """
@@ -3343,24 +3348,93 @@ def intelligent_decision_export_maintenance_report(record_id: int):
                     WHERE id = ?
                     """,
                     (
-                        float(quick["rul_hours"] or row["rul_hours"] or 0.0),
-                        str(quick["status_risk"] or row["status_risk"] or ""),
-                        str(quick["trend_svg"] or trend_svg),
-                        str(quick["fft_svg"] or fft_svg),
+                        rul_hours,
+                        status_risk,
+                        trend_svg,
+                        fft_svg,
                         report_md or str(row["report_markdown"] or ""),
                         _utc_now_iso(),
                         record_id,
                     ),
                 )
                 conn.commit()
+            row = _query_decision_row(record_id) or row
+            report_md = str(row["report_markdown"] or report_md or "").strip()
+            trend_svg = str(row["trend_svg"] or trend_svg or "").strip()
+            fft_svg = str(row["fft_svg"] or fft_svg or "").strip()
         except Exception:
             pass
 
     if not report_md:
-        report_md = "# 数控机床故障综合维护报告\\n\\n暂无可导出的报告内容。"
+        report_md = "# 数控机床故障综合维护报告\n\n暂无可导出的报告内容。"
 
-    filename = f"综合维护报告_{record_id}.md"
-    resp = Response(report_md, mimetype="text/markdown; charset=utf-8")
+    fault_name = str(row["fault_name"] or "-")
+    mechanism = str(row["mechanism"] or "-")
+    suggestions = str(row["suggestions"] or "-")
+    consequence = str(row["consequence"] or "-")
+    confidence = round(float(row["confidence"] or 0.0), 2)
+    risk_level = str(row["risk_level"] or "-")
+    rul_hours = round(float(row["rul_hours"] or 0.0), 2)
+    status_risk = str(row["status_risk"] or "-")
+    source_dataset = str(row["source_dataset"] or "-")
+    source_model = str(row["source_model"] or "-")
+    source_file = str(row["source_file"] or "-")
+
+    report_text_html = html.escape(report_md).replace("\n", "<br/>")
+    trend_block = trend_svg if trend_svg else "<div style='color:#7d8ca6;'>暂无健康趋势图</div>"
+    fft_block = fft_svg if fft_svg else "<div style='color:#7d8ca6;'>暂无震动频谱图</div>"
+    html_doc = f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>综合维护报告_{record_id}</title>
+  <style>
+    body{{font-family:Segoe UI,Microsoft YaHei,sans-serif;background:#f6f8fc;color:#1f2a44;margin:0;padding:20px;}}
+    .card{{max-width:1080px;margin:0 auto;background:#fff;border:1px solid #dfe6f5;border-radius:12px;padding:18px;}}
+    h1{{margin:0 0 12px 0;font-size:28px;}} h2{{margin:18px 0 8px 0;font-size:20px;}}
+    .grid{{display:grid;grid-template-columns:1fr 1fr;gap:10px;}}
+    .item{{background:#f7faff;border:1px solid #e3ebfb;border-radius:8px;padding:10px;}}
+    .plot{{margin-top:8px;border:1px solid #e5ebfa;border-radius:10px;padding:8px;background:#fff;overflow:auto;}}
+    .text-box{{white-space:normal;background:#fff;border:1px solid #e4e8ef;border-radius:8px;padding:10px;line-height:1.6;}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>数控机床故障综合维护报告</h1>
+    <div class="grid">
+      <div class="item">故障名称：{html.escape(fault_name)}</div>
+      <div class="item">诊断置信度：{confidence}%</div>
+      <div class="item">风险等级：{html.escape(risk_level)}</div>
+      <div class="item">RUL：{rul_hours} 小时</div>
+      <div class="item">状态评估与风险等级：{html.escape(status_risk)}</div>
+      <div class="item">数据集：{html.escape(source_dataset)}</div>
+      <div class="item">模型：{html.escape(source_model)}</div>
+      <div class="item">样本文件：{html.escape(source_file)}</div>
+    </div>
+
+    <h2>机理</h2>
+    <div class="text-box">{html.escape(mechanism)}</div>
+
+    <h2>建议</h2>
+    <div class="text-box">{html.escape(suggestions)}</div>
+
+    <h2>不维修可能后果</h2>
+    <div class="text-box">{html.escape(consequence)}</div>
+
+    <h2>健康趋势图</h2>
+    <div class="plot">{trend_block}</div>
+
+    <h2>震动频谱图</h2>
+    <div class="plot">{fft_block}</div>
+
+    <h2>综合维护报告文本</h2>
+    <div class="text-box">{report_text_html}</div>
+  </div>
+</body>
+</html>"""
+
+    filename = f"综合维护报告_{record_id}.html"
+    resp = Response(html_doc, mimetype="text/html; charset=utf-8")
     resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{requests.utils.quote(filename)}"
     return resp
 

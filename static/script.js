@@ -1036,7 +1036,7 @@ async function downloadDecisionMaintenanceReport(recordId) {
     const blob = await res.blob();
     const cd = res.headers.get("content-disposition") || "";
     const matched = cd.match(/filename\*=UTF-8''([^;]+)/i);
-    let filename = `综合维护报告_${recordId}.md`;
+    let filename = `综合维护报告_${recordId}.html`;
     if (matched && matched[1]) {
       try {
         filename = decodeURIComponent(matched[1]);
@@ -1254,7 +1254,6 @@ async function openDecisionModal(mode, recordId) {
     if (decisionReportDetail) {
       const trendSvg = String(decisionField(row, "trendSvg", "健康趋势图") || "");
       const fftSvg = String(decisionField(row, "fftSvg", "震动频谱图") || "");
-      const fullReport = String(decisionField(row, "reportMarkdown", "综合维护报告") || "").trim() || buildDecisionReportFallbackText(row);
       const statusRisk = String(decisionField(row, "statusRisk", "状态评估与风险等级") || "-");
       decisionReportDetail.innerHTML = `
         <div class="admin-detail-title">综合维护报告详情</div>
@@ -1274,8 +1273,6 @@ async function openDecisionModal(mode, recordId) {
           <div>${trendSvg || "<div class='admin-empty'>暂无</div>"}</div>
           <div style="margin-top:10px;"><b>震动频谱图</b></div>
           <div>${fftSvg || "<div class='admin-empty'>暂无</div>"}</div>
-          <div style="margin-top:10px;"><b>综合维护报告文本</b></div>
-          <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e4e8ef;border-radius:8px;padding:8px;">${escapeHtml(fullReport)}</pre>
         </div>
       `;
     }
