@@ -1,4 +1,4 @@
-const moduleTabs = document.querySelectorAll(".side-nav-item");
+﻿const moduleTabs = document.querySelectorAll(".side-nav-item");
 const modules = document.querySelectorAll(".module");
 const appShell = document.getElementById("appShell");
 const moduleSidebar = document.querySelector(".module-sidebar");
@@ -153,6 +153,26 @@ const decisionConsequenceInput = document.getElementById("decisionConsequenceInp
 const decisionModalSaveBtn = document.getElementById("decisionModalSaveBtn");
 const decisionModalMessage = document.getElementById("decisionModalMessage");
 const decisionReportDetail = document.getElementById("decisionReportDetail");
+const decisionCreateModal = document.getElementById("decisionCreateModal");
+const decisionCreateModalCloseBtn = document.getElementById("decisionCreateModalCloseBtn");
+const decisionCreateManualTabBtn = document.getElementById("decisionCreateManualTabBtn");
+const decisionCreateImportTabBtn = document.getElementById("decisionCreateImportTabBtn");
+const decisionCreateManualPane = document.getElementById("decisionCreateManualPane");
+const decisionCreateImportPane = document.getElementById("decisionCreateImportPane");
+const decisionCreateFaultInput = document.getElementById("decisionCreateFaultInput");
+const decisionCreateConfidenceInput = document.getElementById("decisionCreateConfidenceInput");
+const decisionCreateMechanismInput = document.getElementById("decisionCreateMechanismInput");
+const decisionCreateSuggestionsInput = document.getElementById("decisionCreateSuggestionsInput");
+const decisionCreateConsequenceInput = document.getElementById("decisionCreateConsequenceInput");
+const decisionCreateDatasetInput = document.getElementById("decisionCreateDatasetInput");
+const decisionCreateModelInput = document.getElementById("decisionCreateModelInput");
+const decisionCreateFileInput = document.getElementById("decisionCreateFileInput");
+const decisionCreateImportFileInput = document.getElementById("decisionCreateImportFileInput");
+const decisionCreateImportModeSelect = document.getElementById("decisionCreateImportModeSelect");
+const decisionCreateImportStartInput = document.getElementById("decisionCreateImportStartInput");
+const decisionCreateImportEndInput = document.getElementById("decisionCreateImportEndInput");
+const decisionCreateSaveBtn = document.getElementById("decisionCreateSaveBtn");
+const decisionCreateMessage = document.getElementById("decisionCreateMessage");
 
 let selectedImage = null;
 let recognition = null;
@@ -226,6 +246,9 @@ const decisionState = {
 const decisionModalState = {
   mode: "detail",
   editId: 0,
+};
+const decisionCreateState = {
+  mode: "manual",
 };
 let DIAG_MODEL_TIPS = {
   cnn: "专为一维时序振动信号设计，通过浅层卷积快速提取局部时域特征，适合数据量中等、追求轻量化快速推理的轴承故障诊断。",
@@ -980,14 +1003,17 @@ function renderCasePagination() {
 }
 
 function setDecisionMessage(text = "") {
-  if (decisionMessage) {
-    decisionMessage.textContent = text;
-  }
+  if (decisionMessage) decisionMessage.textContent = text;
 }
 
-function toggleDecisionCreateBlock(show) {
-  if (!decisionCreateBlock) return;
-  decisionCreateBlock.classList.toggle("hidden", !show);
+function decisionField(row, ...keys) {
+  for (const key of keys) {
+    if (row && Object.prototype.hasOwnProperty.call(row, key)) {
+      const val = row[key];
+      if (val !== undefined && val !== null && String(val) !== "") return val;
+    }
+  }
+  return "";
 }
 
 function truncateText(text, limit = 10) {
@@ -995,16 +1021,46 @@ function truncateText(text, limit = 10) {
   return s.length > limit ? `${s.slice(0, limit)}...` : s;
 }
 
+async function downloadDecisionMaintenanceReport(recordId) {
+  try {
+    setDecisionMessage("正在准备下载综合维护报告...");
+    const res = await fetch(`/api/intelligent-decisions/${recordId}/export-maintenance-report`);
+    if (!res.ok) {
+      let msg = "下载失败";
+      try {
+        const data = await res.json();
+        msg = data.error || msg;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get("content-disposition") || "";
+    const matched = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    let filename = `综合维护报告_${recordId}.md`;
+    if (matched && matched[1]) {
+      try {
+        filename = decodeURIComponent(matched[1]);
+      } catch (_) {}
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setDecisionMessage(`下载已开始：${filename}`);
+  } catch (e) {
+    setDecisionMessage(e.message || "下载失败");
+  }
+}
+
 async function loadDecisionModule() {
-  if (!decisionTableWrap || !decisionPagination) {
-    return;
-  }
+  if (!decisionTableWrap || !decisionPagination) return;
   decisionTableWrap.innerHTML = "<div class='admin-empty'>正在加载智能决策记录...</div>";
-  toggleDecisionCreateBlock(false);
   setDecisionMessage("");
-  if (decisionFieldFilter) {
-    decisionFieldFilter.value = decisionState.searchField || "all";
-  }
+  if (decisionFieldFilter) decisionFieldFilter.value = decisionState.searchField || "all";
   try {
     const params = new URLSearchParams({
       page: String(decisionState.page),
@@ -1018,17 +1074,13 @@ async function loadDecisionModule() {
       return;
     }
     const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "加载失败");
-    }
+    if (!res.ok) throw new Error(data.error || "加载失败");
     const pg = data.pagination || {};
     decisionState.page = Number(pg.page || 1);
     decisionState.pageSize = Number(pg.pageSize || 10);
     decisionState.total = Number(pg.total || 0);
     decisionState.pages = Math.max(1, Number(pg.pages || 1));
-    if (decisionModuleMeta) {
-      decisionModuleMeta.textContent = `共 ${decisionState.total} 条智能决策记录，每页 ${decisionState.pageSize} 条`;
-    }
+    if (decisionModuleMeta) decisionModuleMeta.textContent = `共 ${decisionState.total} 条智能决策记录，每页 ${decisionState.pageSize} 条`;
     renderDecisionTable(Array.isArray(data.rows) ? data.rows : []);
     renderDecisionPagination();
   } catch (e) {
@@ -1043,27 +1095,36 @@ function renderDecisionTable(rows) {
   const safeRows = Array.isArray(rows) ? rows : [];
   const tbody = safeRows.length
     ? safeRows
-        .map(
-          (row) => `
+        .map((row) => {
+          const faultName = String(decisionField(row, "faultName", "故障名称") || "");
+          const mechanism = String(decisionField(row, "mechanismText", "机理") || "");
+          const suggestions = String(decisionField(row, "suggestionsText", "建议") || "");
+          const consequence = String(decisionField(row, "consequenceText", "不维修可能后果") || "");
+          const statusRisk = String(decisionField(row, "statusRisk", "状态评估与风险等级") || "-");
+          const trendSvg = String(decisionField(row, "trendSvg", "健康趋势图") || "");
+          const fftSvg = String(decisionField(row, "fftSvg", "震动频谱图") || "");
+          const rul = decisionField(row, "RUL");
+          return `
       <tr>
-        <td title="${escapeHtml(row["故障名称"] || "")}">${escapeHtml(truncateText(row["故障名称"] || "", 10))}</td>
-        <td title="${escapeHtml(row["机理"] || "")}">${escapeHtml(truncateText(row["机理"] || "", 10))}</td>
-        <td title="${escapeHtml(row["建议"] || "")}">${escapeHtml(truncateText(row["建议"] || "", 10))}</td>
-        <td title="${escapeHtml(row["不维修可能后果"] || "")}">${escapeHtml(truncateText(row["不维修可能后果"] || "", 10))}</td>
-        <td>${escapeHtml(String(row["RUL"] ?? "-"))}</td>
-        <td title="${escapeHtml(row["状态评估与风险等级"] || "")}">${escapeHtml(truncateText(row["状态评估与风险等级"] || "-", 14))}</td>
-        <td>${row["健康趋势图"] ? "已生成" : "-"}</td>
-        <td>${row["震动频谱图"] ? "已生成" : "-"}</td>
+        <td title="${escapeHtml(faultName)}">${escapeHtml(truncateText(faultName, 10))}</td>
+        <td title="${escapeHtml(mechanism)}">${escapeHtml(truncateText(mechanism, 10))}</td>
+        <td title="${escapeHtml(suggestions)}">${escapeHtml(truncateText(suggestions, 10))}</td>
+        <td title="${escapeHtml(consequence)}">${escapeHtml(truncateText(consequence, 10))}</td>
+        <td>${escapeHtml(String(rul ?? "-"))}</td>
+        <td title="${escapeHtml(statusRisk)}">${escapeHtml(truncateText(statusRisk, 14))}</td>
+        <td>${trendSvg ? "已生成" : "-"}</td>
+        <td>${fftSvg ? "已生成" : "-"}</td>
         <td>
           <button class="case-op-btn" data-op="detail" data-id="${Number(row.id || 0)}">查看详情</button>
           <button class="case-op-btn" data-op="edit" data-id="${Number(row.id || 0)}">编辑</button>
           <button class="case-op-btn danger" data-op="delete" data-id="${Number(row.id || 0)}">删除</button>
           <button class="case-op-btn" data-op="download" data-id="${Number(row.id || 0)}">下载综合维护报告</button>
         </td>
-      </tr>`,
-        )
+      </tr>`;
+        })
         .join("")
     : `<tr><td colspan="9">暂无数据</td></tr>`;
+
   decisionTableWrap.innerHTML = `<div class="admin-table-scroll"><table class="admin-table decision-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
 
   decisionTableWrap.querySelectorAll(".case-op-btn").forEach((btn) => {
@@ -1071,14 +1132,9 @@ function renderDecisionTable(rows) {
       const op = btn.getAttribute("data-op") || "";
       const recordId = Number(btn.getAttribute("data-id") || 0);
       if (!recordId) return;
-      if (op === "download") {
-        window.open(`/api/intelligent-decisions/${recordId}/export-maintenance-report`, "_blank");
-        return;
-      }
-      if (op === "detail") {
-        await openDecisionModal("detail", recordId);
-        return;
-      }
+      if (op === "download") return downloadDecisionMaintenanceReport(recordId);
+      if (op === "detail") return openDecisionModal("detail", recordId);
+      if (op === "edit") return openDecisionModal("edit", recordId);
       if (op === "delete") {
         const ok = window.confirm("确定删除该条智能决策记录吗？");
         if (!ok) return;
@@ -1090,10 +1146,6 @@ function renderDecisionTable(rows) {
         } catch (e) {
           setDecisionMessage(e.message || "删除失败");
         }
-        return;
-      }
-      if (op === "edit") {
-        await openDecisionModal("edit", recordId);
       }
     });
   });
@@ -1121,28 +1173,20 @@ function renderDecisionPagination() {
 }
 
 function setDecisionModalEditable(editable) {
-  [decisionFaultNameInput, decisionConfidenceEditInput, decisionMechanismInput, decisionSuggestionsInput, decisionConsequenceInput].forEach(
-    (el) => {
-      if (!el) return;
-      el.readOnly = !editable;
-      if (el.type === "number") {
-        el.disabled = !editable;
-      }
-    }
-  );
+  [decisionFaultNameInput, decisionConfidenceEditInput, decisionMechanismInput, decisionSuggestionsInput, decisionConsequenceInput].forEach((el) => {
+    if (!el) return;
+    el.readOnly = !editable;
+    if (el.type === "number") el.disabled = !editable;
+  });
   if (decisionRiskLevelInput) {
     decisionRiskLevelInput.readOnly = true;
     decisionRiskLevelInput.disabled = false;
   }
-  if (decisionModalSaveBtn) {
-    decisionModalSaveBtn.style.display = editable ? "inline-flex" : "none";
-  }
+  if (decisionModalSaveBtn) decisionModalSaveBtn.style.display = editable ? "inline-flex" : "none";
 }
 
 function setDecisionModalMessage(text = "") {
-  if (decisionModalMessage) {
-    decisionModalMessage.textContent = text;
-  }
+  if (decisionModalMessage) decisionModalMessage.textContent = text;
 }
 
 function riskByConfidence(confidence) {
@@ -1154,27 +1198,32 @@ function riskByConfidence(confidence) {
 }
 
 function buildDecisionReportFallbackText(row) {
+  const faultName = String(decisionField(row, "faultName", "故障名称") || "-");
+  const mechanism = String(decisionField(row, "mechanismText", "机理") || "-");
+  const suggestions = String(decisionField(row, "suggestionsText", "建议") || "-");
+  const consequence = String(decisionField(row, "consequenceText", "不维修可能后果") || "-");
+  const statusRisk = String(decisionField(row, "statusRisk", "状态评估与风险等级") || "-");
   return [
     "# 数控机床故障综合维护报告",
     "",
     "## 1. 记录信息",
-    `- 故障名称：${row["故障名称"] || "-"}`,
+    `- 故障名称：${faultName}`,
     `- 诊断置信度：${row.confidence ?? 0}%`,
-    `- 风险等级：${row.riskLevel || "-"}`,
-    `- RUL：${row["RUL"] ?? 0} 小时`,
-    `- 状态评估与风险等级：${row["状态评估与风险等级"] || "-"}`,
+    `- 风险等级：${row.riskLevel || riskByConfidence(row.confidence)}`,
+    `- RUL：${row.RUL ?? 0} 小时`,
+    `- 状态评估与风险等级：${statusRisk}`,
     `- 数据集：${row.sourceDataset || "-"}`,
     `- 模型：${row.sourceModel || "-"}`,
     `- 样本文件：${row.sourceFile || "-"}`,
     "",
     "## 2. 机理",
-    row["机理"] || "-",
+    mechanism,
     "",
     "## 3. 维护建议",
-    row["建议"] || "-",
+    suggestions,
     "",
     "## 4. 不维修可能后果",
-    row["不维修可能后果"] || "-",
+    consequence,
   ].join("\n");
 }
 
@@ -1194,46 +1243,45 @@ async function openDecisionModal(mode, recordId) {
     const row = data.record || {};
     decisionModalState.mode = mode === "edit" ? "edit" : "detail";
     decisionModalState.editId = Number(recordId || 0);
-    if (decisionModalTitle) {
-      decisionModalTitle.textContent = decisionModalState.mode === "edit" ? "编辑智能决策" : "智能决策详情";
-    }
-    if (decisionFaultNameInput) decisionFaultNameInput.value = row["故障名称"] || "";
+    if (decisionModalTitle) decisionModalTitle.textContent = decisionModalState.mode === "edit" ? "编辑智能决策" : "智能决策详情";
+    if (decisionFaultNameInput) decisionFaultNameInput.value = String(decisionField(row, "faultName", "故障名称") || "");
     if (decisionConfidenceEditInput) decisionConfidenceEditInput.value = String(row.confidence ?? 0);
-    if (decisionMechanismInput) decisionMechanismInput.value = row["机理"] || "";
-    if (decisionRiskLevelInput) decisionRiskLevelInput.value = row.riskLevel || "-";
-    if (decisionSuggestionsInput) decisionSuggestionsInput.value = row["建议"] || "";
-    if (decisionConsequenceInput) decisionConsequenceInput.value = row["不维修可能后果"] || "";
+    if (decisionMechanismInput) decisionMechanismInput.value = String(decisionField(row, "mechanismText", "机理") || "");
+    if (decisionRiskLevelInput) decisionRiskLevelInput.value = String(row.riskLevel || riskByConfidence(row.confidence));
+    if (decisionSuggestionsInput) decisionSuggestionsInput.value = String(decisionField(row, "suggestionsText", "建议") || "");
+    if (decisionConsequenceInput) decisionConsequenceInput.value = String(decisionField(row, "consequenceText", "不维修可能后果") || "");
+
     if (decisionReportDetail) {
-      const trendSvg = row["健康趋势图"] || "";
-      const fftSvg = row["震动频谱图"] || "";
-      const fullReport = (row["综合维护报告"] || "").trim() || buildDecisionReportFallbackText(row);
+      const trendSvg = String(decisionField(row, "trendSvg", "健康趋势图") || "");
+      const fftSvg = String(decisionField(row, "fftSvg", "震动频谱图") || "");
+      const fullReport = String(decisionField(row, "reportMarkdown", "综合维护报告") || "").trim() || buildDecisionReportFallbackText(row);
+      const statusRisk = String(decisionField(row, "statusRisk", "状态评估与风险等级") || "-");
       decisionReportDetail.innerHTML = `
         <div class="admin-detail-title">综合维护报告详情</div>
         <div class="admin-table-scroll" style="max-height:50vh;padding:10px;">
-          <div><b>故障名称：</b>${escapeHtml(row["故障名称"] || "-")}</div>
+          <div><b>故障名称：</b>${escapeHtml(String(decisionField(row, "faultName", "故障名称") || "-"))}</div>
           <div style="margin-top:6px;"><b>诊断置信度：</b>${escapeHtml(String(row.confidence ?? 0))}%</div>
-          <div style="margin-top:6px;"><b>风险等级：</b>${escapeHtml(row.riskLevel || "-")}</div>
-          <div><b>RUL：</b>${escapeHtml(String(row["RUL"] ?? "-"))} 小时</div>
-          <div style="margin-top:6px;"><b>状态评估与风险等级：</b>${escapeHtml(row["状态评估与风险等级"] || "-")}</div>
-          <div style="margin-top:6px;"><b>数据集：</b>${escapeHtml(row.sourceDataset || "-")}</div>
-          <div style="margin-top:6px;"><b>模型：</b>${escapeHtml(row.sourceModel || "-")}</div>
-          <div style="margin-top:6px;"><b>样本文件：</b>${escapeHtml(row.sourceFile || "-")}</div>
-          <div style="margin-top:10px;"><b>机理：</b>${escapeHtml(row["机理"] || "-")}</div>
-          <div style="margin-top:10px;"><b>建议：</b>${escapeHtml(row["建议"] || "-")}</div>
-          <div style="margin-top:10px;"><b>不维修可能后果：</b>${escapeHtml(row["不维修可能后果"] || "-")}</div>
+          <div style="margin-top:6px;"><b>风险等级：</b>${escapeHtml(String(row.riskLevel || "-"))}</div>
+          <div style="margin-top:6px;"><b>RUL：</b>${escapeHtml(String(row.RUL ?? "-"))} 小时</div>
+          <div style="margin-top:6px;"><b>状态评估与风险等级：</b>${escapeHtml(statusRisk)}</div>
+          <div style="margin-top:6px;"><b>数据集：</b>${escapeHtml(String(row.sourceDataset || "-"))}</div>
+          <div style="margin-top:6px;"><b>模型：</b>${escapeHtml(String(row.sourceModel || "-"))}</div>
+          <div style="margin-top:6px;"><b>样本文件：</b>${escapeHtml(String(row.sourceFile || "-"))}</div>
+          <div style="margin-top:10px;"><b>机理：</b>${escapeHtml(String(decisionField(row, "mechanismText", "机理") || "-"))}</div>
+          <div style="margin-top:10px;"><b>建议：</b>${escapeHtml(String(decisionField(row, "suggestionsText", "建议") || "-"))}</div>
+          <div style="margin-top:10px;"><b>不维修可能后果：</b>${escapeHtml(String(decisionField(row, "consequenceText", "不维修可能后果") || "-"))}</div>
           <div style="margin-top:10px;"><b>健康趋势图</b></div>
-          <div>${trendSvg || "<div class='admin-empty'>无</div>"}</div>
+          <div>${trendSvg || "<div class='admin-empty'>暂无</div>"}</div>
           <div style="margin-top:10px;"><b>震动频谱图</b></div>
-          <div>${fftSvg || "<div class='admin-empty'>无</div>"}</div>
+          <div>${fftSvg || "<div class='admin-empty'>暂无</div>"}</div>
           <div style="margin-top:10px;"><b>综合维护报告文本</b></div>
           <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e4e8ef;border-radius:8px;padding:8px;">${escapeHtml(fullReport)}</pre>
         </div>
       `;
     }
+
     setDecisionModalEditable(decisionModalState.mode === "edit");
-    setDecisionModalMessage(
-      decisionModalState.mode === "edit" ? "可编辑并保存全部字段。" : `风险程度：${row.riskLevel || "-"}`
-    );
+    setDecisionModalMessage(decisionModalState.mode === "edit" ? "可编辑并保存全部字段。" : `风险程度：${row.riskLevel || "-"}`);
     decisionEditModal?.classList.remove("hidden");
   } catch (e) {
     setDecisionMessage(e.message || "读取记录失败");
@@ -1241,9 +1289,7 @@ async function openDecisionModal(mode, recordId) {
 }
 
 async function saveDecisionModal() {
-  if (decisionModalState.mode !== "edit" || !decisionModalState.editId) {
-    return;
-  }
+  if (decisionModalState.mode !== "edit" || !decisionModalState.editId) return;
   setDecisionModalMessage("");
   const confidence = Number(decisionConfidenceEditInput?.value || 0);
   try {
@@ -1251,10 +1297,10 @@ async function saveDecisionModal() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        故障名称: (decisionFaultNameInput?.value || "").trim(),
-        机理: (decisionMechanismInput?.value || "").trim(),
-        建议: (decisionSuggestionsInput?.value || "").trim(),
-        不维修可能后果: (decisionConsequenceInput?.value || "").trim(),
+        faultName: (decisionFaultNameInput?.value || "").trim(),
+        mechanism: (decisionMechanismInput?.value || "").trim(),
+        suggestions: (decisionSuggestionsInput?.value || "").trim(),
+        consequence: (decisionConsequenceInput?.value || "").trim(),
         confidence: Number.isFinite(confidence) ? confidence : 0,
       }),
     });
@@ -1268,33 +1314,97 @@ async function saveDecisionModal() {
   }
 }
 
-async function generateDecisionByInput() {
-  setDecisionMessage("");
-  const faultName = (decisionFaultInput?.value || "").trim();
-  const confidenceValue = Number(decisionConfidenceInput?.value || 0);
-  if (!faultName) {
-    setDecisionMessage("请先输入故障名称。");
+function setDecisionCreateMessage(text = "") {
+  if (decisionCreateMessage) decisionCreateMessage.textContent = text;
+}
+
+function setDecisionCreateModalTab(mode) {
+  decisionCreateState.mode = mode === "import" ? "import" : "manual";
+  decisionCreateManualTabBtn?.classList.toggle("active", decisionCreateState.mode === "manual");
+  decisionCreateImportTabBtn?.classList.toggle("active", decisionCreateState.mode === "import");
+  decisionCreateManualPane?.classList.toggle("hidden", decisionCreateState.mode !== "manual");
+  decisionCreateImportPane?.classList.toggle("hidden", decisionCreateState.mode !== "import");
+}
+
+function openDecisionCreateModal() {
+  if (!decisionCreateModal) return;
+  if (decisionCreateFaultInput) decisionCreateFaultInput.value = "";
+  if (decisionCreateConfidenceInput) decisionCreateConfidenceInput.value = "";
+  if (decisionCreateMechanismInput) decisionCreateMechanismInput.value = "";
+  if (decisionCreateSuggestionsInput) decisionCreateSuggestionsInput.value = "";
+  if (decisionCreateConsequenceInput) decisionCreateConsequenceInput.value = "";
+  if (decisionCreateDatasetInput) decisionCreateDatasetInput.value = "";
+  if (decisionCreateModelInput) decisionCreateModelInput.value = "";
+  if (decisionCreateFileInput) decisionCreateFileInput.value = "";
+  if (decisionCreateImportFileInput) decisionCreateImportFileInput.value = "";
+  if (decisionCreateImportModeSelect) decisionCreateImportModeSelect.value = "all";
+  if (decisionCreateImportStartInput) decisionCreateImportStartInput.value = "1";
+  if (decisionCreateImportEndInput) decisionCreateImportEndInput.value = "1";
+  setDecisionCreateMessage("");
+  setDecisionCreateModalTab("manual");
+  decisionCreateModal.classList.remove("hidden");
+}
+
+function closeDecisionCreateModal() {
+  decisionCreateModal?.classList.add("hidden");
+  setDecisionCreateMessage("");
+}
+
+async function submitDecisionCreateModal() {
+  setDecisionCreateMessage("");
+  if (decisionCreateState.mode === "import") {
+    const file = decisionCreateImportFileInput?.files?.[0];
+    if (!file) {
+      setDecisionCreateMessage("请先选择CSV文件。");
+      return;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    form.append("importMode", decisionCreateImportModeSelect?.value || "all");
+    form.append("startRow", decisionCreateImportStartInput?.value || "1");
+    form.append("endRow", decisionCreateImportEndInput?.value || "1");
+    try {
+      const res = await fetch("/api/intelligent-decisions/import", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "导入失败");
+      closeDecisionCreateModal();
+      decisionState.page = 1;
+      await loadDecisionModule();
+      setDecisionMessage(`导入成功，共 ${Number(data.imported || 0)} 条。`);
+    } catch (e) {
+      setDecisionCreateMessage(e.message || "导入失败");
+    }
+    return;
+  }
+
+  const payload = {
+    faultName: (decisionCreateFaultInput?.value || "").trim(),
+    confidence: Number(decisionCreateConfidenceInput?.value || 0),
+    mechanism: (decisionCreateMechanismInput?.value || "").trim(),
+    suggestions: (decisionCreateSuggestionsInput?.value || "").trim(),
+    consequence: (decisionCreateConsequenceInput?.value || "").trim(),
+    sourceDataset: (decisionCreateDatasetInput?.value || "").trim(),
+    sourceModel: (decisionCreateModelInput?.value || "").trim(),
+    sourceFile: (decisionCreateFileInput?.value || "").trim(),
+  };
+  if (!payload.faultName) {
+    setDecisionCreateMessage("请填写故障名称。");
     return;
   }
   try {
-    const res = await fetch("/api/intelligent-decisions/generate", {
+    const res = await fetch("/api/intelligent-decisions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        faultName,
-        confidence: Number.isFinite(confidenceValue) ? confidenceValue : 0,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "生成失败");
-    setDecisionMessage(`已生成并保存，风险程度：${data.record?.riskLevel || "-"}`);
-    if (decisionFaultInput) decisionFaultInput.value = "";
-    if (decisionConfidenceInput) decisionConfidenceInput.value = "";
-    toggleDecisionCreateBlock(false);
+    if (!res.ok) throw new Error(data.error || "保存失败");
+    closeDecisionCreateModal();
     decisionState.page = 1;
     await loadDecisionModule();
+    setDecisionMessage("记录已添加。");
   } catch (e) {
-    setDecisionMessage(e.message || "生成失败");
+    setDecisionCreateMessage(e.message || "保存失败");
   }
 }
 
@@ -1304,9 +1414,7 @@ async function saveDiagToDecision() {
     return;
   }
   const result = diagState.lastInference;
-  if (diagSaveDecisionMsg) {
-    diagSaveDecisionMsg.textContent = "正在保存到智能决策...";
-  }
+  if (diagSaveDecisionMsg) diagSaveDecisionMsg.textContent = "正在保存到智能决策...";
   try {
     const res = await fetch("/api/intelligent-decisions/from-diagnosis", {
       method: "POST",
@@ -1324,14 +1432,10 @@ async function saveDiagToDecision() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "保存失败");
-    if (diagSaveDecisionMsg) {
-      diagSaveDecisionMsg.textContent = `保存成功：风险程度 ${data.record?.riskLevel || "-"}`;
-    }
+    if (diagSaveDecisionMsg) diagSaveDecisionMsg.textContent = `保存成功：风险程度 ${data.record?.riskLevel || "-"}`;
     switchModule("decisionModule");
   } catch (e) {
-    if (diagSaveDecisionMsg) {
-      diagSaveDecisionMsg.textContent = e.message || "保存失败";
-    }
+    if (diagSaveDecisionMsg) diagSaveDecisionMsg.textContent = e.message || "保存失败";
   }
 }
 
@@ -1375,7 +1479,6 @@ async function generateMaintenanceReportFromDiag() {
     setDecisionMessage(e.message || "综合维护报告生成失败");
   }
 }
-
 function resetCaseModalMessage(text = "") {
   if (caseModalMessage) {
     caseModalMessage.textContent = text;
@@ -2799,16 +2902,14 @@ caseSourceFilter?.addEventListener("change", async () => {
   caseState.page = 1;
   await loadAdminCaseModule();
 });
-decisionGenerateBtn?.addEventListener("click", generateDecisionByInput);
 decisionAddBtn?.addEventListener("click", () => {
-  toggleDecisionCreateBlock(true);
-  decisionFaultInput?.focus();
+  openDecisionCreateModal();
+  decisionCreateFaultInput?.focus();
 });
-decisionCreateCancelBtn?.addEventListener("click", () => {
-  if (decisionFaultInput) decisionFaultInput.value = "";
-  if (decisionConfidenceInput) decisionConfidenceInput.value = "";
-  toggleDecisionCreateBlock(false);
-});
+decisionCreateModalCloseBtn?.addEventListener("click", closeDecisionCreateModal);
+decisionCreateManualTabBtn?.addEventListener("click", () => setDecisionCreateModalTab("manual"));
+decisionCreateImportTabBtn?.addEventListener("click", () => setDecisionCreateModalTab("import"));
+decisionCreateSaveBtn?.addEventListener("click", submitDecisionCreateModal);
 decisionSearchBtn?.addEventListener("click", async () => {
   decisionState.keyword = (decisionSearchInput?.value || "").trim();
   decisionState.searchField = decisionFieldFilter?.value || "all";
@@ -3024,3 +3125,4 @@ if (initialFile) {
 const defaultModule = isAdminUser ? "consoleModule" : "homeModule";
 const targetModule = initialModule && document.getElementById(initialModule) ? initialModule : defaultModule;
 switchModule(targetModule);
+

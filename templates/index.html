@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -341,15 +341,6 @@
           <button id="decisionSearchBtn" class="ghost-btn" type="button">搜索</button>
           <button id="decisionResetBtn" class="ghost-btn" type="button">重置</button>
         </div>
-        <div id="decisionCreateBlock" class="hidden">
-          <div class="admin-detail-title">添加智能决策记录</div>
-          <div class="case-toolbar decision-create-toolbar">
-            <input id="decisionFaultInput" class="case-input" type="text" placeholder="输入故障名称，如：内圈故障-(0.014英寸)" />
-            <input id="decisionConfidenceInput" class="case-input" type="number" min="0" max="100" step="0.01" placeholder="置信度(%)，如 86.3" />
-            <button id="decisionGenerateBtn" class="rect-primary-btn" type="button">生成并保存</button>
-            <button id="decisionCreateCancelBtn" class="ghost-btn" type="button">取消</button>
-          </div>
-        </div>
         <div id="decisionModuleMeta" class="admin-detail-title"></div>
         <div id="decisionMessage" class="profile-msg"></div>
         <div id="decisionTableWrap" class="admin-table-wrap"></div>
@@ -531,15 +522,57 @@
           <label>结束行<input id="caseImportEndInput" type="number" min="1" value="1" /></label>
         </div>
       </div>
-
-      <div id="decisionReportDetail" class="admin-table-wrap"></div>
-      <div class="case-modal-actions">
+<div class="case-modal-actions">
         <button id="caseModalSaveBtn" class="rect-primary-btn" type="button">保存</button>
       </div>
       <div id="caseModalMessage" class="profile-msg"></div>
     </div>
   </section>
 
+  <section id="decisionCreateModal" class="case-modal hidden" aria-label="添加智能决策记录">
+    <div class="case-modal-card">
+      <div class="case-modal-head">
+        <h3 id="decisionCreateModalTitle">添加记录</h3>
+        <button id="decisionCreateModalCloseBtn" class="ghost-btn" type="button">关闭</button>
+      </div>
+      <div class="case-modal-tabs">
+        <button id="decisionCreateManualTabBtn" class="ghost-btn active" type="button">手动输入</button>
+        <button id="decisionCreateImportTabBtn" class="ghost-btn" type="button">导入CSV</button>
+      </div>
+
+      <div id="decisionCreateManualPane" class="case-modal-pane">
+        <div class="case-form-grid decision-form-grid">
+          <label class="decision-fault">故障名称<input id="decisionCreateFaultInput" type="text" /></label>
+          <label class="decision-confidence">置信度(%)<input id="decisionCreateConfidenceInput" type="number" min="0" max="100" step="0.01" /></label>
+          <label class="decision-mechanism">机理<textarea id="decisionCreateMechanismInput" rows="3"></textarea></label>
+          <label class="decision-suggestions">建议<textarea id="decisionCreateSuggestionsInput" rows="3"></textarea></label>
+          <label class="decision-consequence">不维修可能后果<textarea id="decisionCreateConsequenceInput" rows="3"></textarea></label>
+          <label class="decision-risk">数据集(可选)<input id="decisionCreateDatasetInput" type="text" /></label>
+          <label class="decision-risk">模型(可选)<input id="decisionCreateModelInput" type="text" /></label>
+          <label class="decision-risk">样本文件(可选)<input id="decisionCreateFileInput" type="text" /></label>
+        </div>
+      </div>
+
+      <div id="decisionCreateImportPane" class="case-modal-pane hidden">
+        <div class="case-form-grid">
+          <label>CSV文件<input id="decisionCreateImportFileInput" type="file" accept=".csv" /></label>
+          <label>导入方式
+            <select id="decisionCreateImportModeSelect">
+              <option value="all">导入全部数据行</option>
+              <option value="range">导入指定行范围</option>
+            </select>
+          </label>
+          <label>起始行<input id="decisionCreateImportStartInput" type="number" min="1" value="1" /></label>
+          <label>结束行<input id="decisionCreateImportEndInput" type="number" min="1" value="1" /></label>
+        </div>
+      </div>
+
+      <div class="case-modal-actions">
+        <button id="decisionCreateSaveBtn" class="rect-primary-btn" type="button">保存</button>
+      </div>
+      <div id="decisionCreateMessage" class="profile-msg"></div>
+    </div>
+  </section>
   <section id="decisionEditModal" class="case-modal hidden" aria-label="智能决策详情/编辑弹窗">
     <div class="case-modal-card">
       <div class="case-modal-head">
@@ -554,6 +587,7 @@
         <label class="decision-consequence">不维修可能后果<textarea id="decisionConsequenceInput" rows="3"></textarea></label>
         <label class="decision-suggestions">建议<textarea id="decisionSuggestionsInput" rows="3"></textarea></label>
       </div>
+      <div id="decisionReportDetail" class="admin-table-wrap"></div>
       <div class="case-modal-actions">
         <button id="decisionModalSaveBtn" class="rect-primary-btn" type="button">保存</button>
       </div>
@@ -565,3 +599,5 @@
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
+
+

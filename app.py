@@ -1,4 +1,4 @@
-import random
+﻿import random
 import re
 import os
 import time
@@ -1073,6 +1073,96 @@ def build_decision_payload(fault_name: str, confidence: Any) -> Dict[str, Any]:
     }
 
 
+def build_quick_maintenance_artifacts(
+    dataset: str,
+    prediction: str,
+    confidence: Any,
+    sample_file: str,
+    model_name: str = "CNN-LSTM",
+) -> Dict[str, Any]:
+    confidence_percent = confidence_to_percent(confidence)
+
+    if confidence_percent >= 80.0:
+        rul_low, rul_high = 12.0, 120.0
+        health_low, health_high = 28.0, 55.0
+        drop_low, drop_high = 28.0, 45.0
+    elif confidence_percent >= 50.0:
+        rul_low, rul_high = 80.0, 260.0
+        health_low, health_high = 55.0, 78.0
+        drop_low, drop_high = 16.0, 30.0
+    else:
+        rul_low, rul_high = 220.0, 600.0
+        health_low, health_high = 78.0, 94.0
+        drop_low, drop_high = 8.0, 18.0
+
+    rul_hours = round(random.uniform(rul_low, rul_high), 1)
+    health_now = round(random.uniform(health_low, health_high), 2)
+    health_start = min(99.0, health_now + random.uniform(drop_low, drop_high))
+
+    trend_points: List[float] = []
+    point_count = 24
+    for i in range(point_count):
+        t = i / max(1, point_count - 1)
+        base = health_start + (health_now - health_start) * t
+        noise = random.uniform(-1.4, 1.4)
+        trend_points.append(max(0.0, min(100.0, round(base + noise, 2))))
+    trend_points[-1] = health_now
+
+    risk_level = _risk_level_by_health_score(health_now)
+    status_eval = _status_eval_by_health_score(health_now)
+    suggestion = (
+        "建议保持润滑与温升巡检，持续跟踪振动包络趋势。"
+        if health_now >= 60.0
+        else "建议尽快安排点检并准备预防性维护窗口，避免故障扩展。"
+    )
+
+    fft_points: List[float] = []
+    base_amp = 0.18 if health_now >= 60.0 else 0.26
+    for i in range(128):
+        v = random.uniform(0.02, base_amp)
+        v += 0.45 * math.exp(-((i - 18) ** 2) / 22.0)
+        v += 0.35 * math.exp(-((i - 46) ** 2) / 34.0)
+        v += 0.28 * math.exp(-((i - 79) ** 2) / 40.0)
+        fft_points.append(round(float(v), 4))
+
+    report_obj = {
+        "dataset": dataset or "-",
+        "model": model_name or "CNN-LSTM",
+        "prediction": prediction or "-",
+        "confidence": round(confidence_percent, 2),
+        "healthSeries": trend_points,
+        "healthScore": health_now,
+        "rulHours": rul_hours,
+        "riskLevel": risk_level,
+        "statusEvaluation": status_eval,
+        "maintenanceAdvice": suggestion,
+    }
+    trend_svg = _build_simple_svg_line(
+        trend_points,
+        color="#2f6fed",
+        x_label="时间窗口 (step)",
+        y_label="健康度",
+        y_unit="%",
+    )
+    fft_svg = _build_simple_svg_line(
+        fft_points,
+        color="#d64f4f",
+        x_label="频率点 (bin)",
+        y_label="振动幅值",
+        y_unit="a.u.",
+    )
+    report_md = build_maintenance_report_text(report_obj, "数控机床主轴轴承", sample_file or "-")
+    status_risk = f"{status_eval} 风险等级：{risk_level}"
+    return {
+        "report": report_obj,
+        "rul_hours": rul_hours,
+        "status_risk": status_risk,
+        "trend_svg": trend_svg,
+        "fft_svg": fft_svg,
+        "report_md": report_md,
+    }
+
+
 def refresh_knowledge_indexes() -> None:
     global kb
     kb = KnowledgeBase(KB_PATHS, csv_dir=CSV_KB_DIR)
@@ -1384,10 +1474,10 @@ def normalize_case_record_payload(payload: Dict[str, Any]) -> Dict[str, str]:
 
 
 def normalize_decision_update_payload(payload: Dict[str, Any], old_row: sqlite3.Row) -> Dict[str, Any]:
-    fault_name = str(payload.get("故障名称", old_row["fault_name"]) or "").strip()
-    mechanism = str(payload.get("机理", old_row["mechanism"]) or "").strip()
-    suggestions = str(payload.get("建议", old_row["suggestions"]) or "").strip()
-    consequence = str(payload.get("不维修可能后果", old_row["consequence"]) or "").strip()
+    fault_name = str(payload.get("faultName", payload.get("故障名称", old_row["fault_name"])) or "").strip()
+    mechanism = str(payload.get("mechanism", payload.get("机理", old_row["mechanism"])) or "").strip()
+    suggestions = str(payload.get("suggestions", payload.get("建议", old_row["suggestions"])) or "").strip()
+    consequence = str(payload.get("consequence", payload.get("不维修可能后果", old_row["consequence"])) or "").strip()
     confidence_percent = confidence_to_percent(payload.get("confidence", old_row["confidence"]))
     if not fault_name or not mechanism or not suggestions or not consequence:
         raise ValueError("请完整填写“故障名称、机理、建议、不维修可能后果”。")
@@ -1400,6 +1490,46 @@ def normalize_decision_update_payload(payload: Dict[str, Any], old_row: sqlite3.
         "consequence": consequence,
         "confidence": confidence_percent,
         "risk_level": risk_level_from_confidence(confidence_percent),
+    }
+
+
+def normalize_decision_create_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    fault_name = str(payload.get("faultName") or payload.get("fault_name") or payload.get("fault") or payload.get("故障名称") or "").strip()
+    if not fault_name:
+        raise ValueError("请输入故障名称。")
+    confidence_percent = confidence_to_percent(payload.get("confidence", 0))
+    category = resolve_fault_category(fault_name) or "未知"
+
+    mechanism = str(payload.get("mechanism") or payload.get("机理") or "").strip()
+    suggestions = str(payload.get("suggestions") or payload.get("建议") or "").strip()
+    consequence = str(payload.get("consequence") or payload.get("不维修可能后果") or payload.get("后果") or "").strip()
+
+    if not mechanism or not suggestions or not consequence:
+        try:
+            built = build_decision_payload(fault_name, confidence_percent)
+        except ValueError:
+            built = {
+                "mechanism": "依据诊断结果推断为该故障类型，建议结合振动与温升趋势进一步复核。",
+                "suggestions": "建议尽快安排点检，并根据趋势变化决定是否执行预防性维护。",
+                "consequence": "若不及时处理，可能导致振动持续恶化并引发停机风险。",
+                "fault_category": category,
+            }
+        mechanism = mechanism or str(built.get("mechanism", "")).strip()
+        suggestions = suggestions or str(built.get("suggestions", "")).strip()
+        consequence = consequence or str(built.get("consequence", "")).strip()
+        category = str(built.get("fault_category", category)).strip() or category
+
+    return {
+        "fault_name": fault_name,
+        "fault_category": category,
+        "mechanism": mechanism,
+        "suggestions": suggestions,
+        "consequence": consequence,
+        "confidence": confidence_percent,
+        "risk_level": risk_level_from_confidence(confidence_percent),
+        "source_dataset": str(payload.get("sourceDataset") or payload.get("dataset") or "").strip(),
+        "source_model": str(payload.get("sourceModel") or payload.get("model") or "").strip(),
+        "source_file": str(payload.get("sourceFile") or payload.get("filePath") or "").strip(),
     }
 
 
@@ -1422,6 +1552,14 @@ def _decision_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         "sourceModel": row["source_model"] or "",
         "sourceFile": row["source_file"] or "",
         "updatedAt": row["updated_at"] or "",
+        "faultName": row["fault_name"] or "",
+        "mechanismText": row["mechanism"] or "",
+        "suggestionsText": row["suggestions"] or "",
+        "consequenceText": row["consequence"] or "",
+        "statusRisk": row["status_risk"] or "",
+        "trendSvg": row["trend_svg"] or "",
+        "fftSvg": row["fft_svg"] or "",
+        "reportMarkdown": row["report_markdown"] or "",
     }
 
 
@@ -2685,6 +2823,205 @@ def intelligent_decisions():
     )
 
 
+@app.post("/api/intelligent-decisions")
+def intelligent_decision_create():
+    payload = request.get_json(silent=True) or {}
+    try:
+        normalized = normalize_decision_create_payload(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    quick = build_quick_maintenance_artifacts(
+        normalized["source_dataset"],
+        normalized["fault_name"],
+        normalized["confidence"],
+        normalized["source_file"],
+        normalized["source_model"] or "CNN-LSTM",
+    )
+    now = _utc_now_iso()
+    created_by = (session.get("username") or "").strip() or "unknown"
+    with _db_connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO intelligent_decision_records (
+                fault_name, fault_category, mechanism, suggestions, consequence,
+                confidence, risk_level, source, source_dataset, source_model, source_file,
+                rul_hours, status_risk, trend_svg, fft_svg, report_markdown,
+                created_by, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized["fault_name"],
+                normalized["fault_category"],
+                normalized["mechanism"],
+                normalized["suggestions"],
+                normalized["consequence"],
+                normalized["confidence"],
+                normalized["risk_level"],
+                "manual",
+                normalized["source_dataset"],
+                normalized["source_model"],
+                normalized["source_file"],
+                quick["rul_hours"],
+                quick["status_risk"],
+                quick["trend_svg"],
+                quick["fft_svg"],
+                quick["report_md"],
+                created_by,
+                now,
+                now,
+            ),
+        )
+        record_id = int(cur.lastrowid or 0)
+        conn.commit()
+    row = _query_decision_row(record_id)
+    return jsonify({"ok": True, "record": _decision_row_to_dict(row) if row else {}})
+
+
+@app.post("/api/intelligent-decisions/import")
+def intelligent_decision_import():
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        return jsonify({"error": "请上传CSV文件。"}), 400
+    if Path(upload.filename).suffix.lower() != ".csv":
+        return jsonify({"error": "仅支持导入CSV文件。"}), 400
+
+    import_mode = (request.form.get("importMode") or "all").strip().lower()
+    try:
+        start_row = max(1, int(request.form.get("startRow", "1") or "1"))
+        end_row = max(1, int(request.form.get("endRow", "1") or "1"))
+    except Exception:
+        return jsonify({"error": "行范围参数无效，请输入正整数。"}), 400
+
+    tmp_name = f"tmp_decision_import_{int(time.time() * 1000)}.csv"
+    tmp_path = BASE_DIR / tmp_name
+    upload.save(tmp_path)
+    try:
+        raw_rows = read_csv_raw_rows(tmp_path)
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
+    if not raw_rows:
+        return jsonify({"error": "CSV文件为空或读取失败。"}), 400
+
+    header_row = [str(c or "").strip() for c in raw_rows[0]]
+    norm_header = [h.lower().replace("_", "").replace(" ", "") for h in header_row]
+    known_fields = {
+        "faultname", "fault", "name", "故障名称",
+        "confidence", "置信度",
+        "mechanism", "机理",
+        "suggestions", "建议",
+        "consequence", "后果", "不维修可能后果",
+        "sourcedataset", "dataset", "数据集",
+        "sourcemodel", "model", "模型",
+        "sourcefile", "filepath", "file", "样本文件",
+    }
+    has_header = any(h in known_fields for h in norm_header)
+    data_rows = raw_rows[1:] if has_header else raw_rows
+    if not data_rows:
+        return jsonify({"error": "CSV文件没有可导入的数据行。"}), 400
+
+    if import_mode == "range":
+        if start_row > end_row:
+            return jsonify({"error": "起始行不能大于结束行。"}), 400
+        if start_row > len(data_rows):
+            return jsonify({"error": "起始行超出CSV有效数据行范围。"}), 400
+        data_rows = data_rows[start_row - 1 : min(end_row, len(data_rows))]
+
+    col_map: Dict[str, int] = {}
+    if has_header:
+        alias_map = {
+            "fault_name": {"faultname", "fault", "name", "故障名称"},
+            "confidence": {"confidence", "置信度"},
+            "mechanism": {"mechanism", "机理"},
+            "suggestions": {"suggestions", "建议"},
+            "consequence": {"consequence", "后果", "不维修可能后果"},
+            "source_dataset": {"sourcedataset", "dataset", "数据集"},
+            "source_model": {"sourcemodel", "model", "模型"},
+            "source_file": {"sourcefile", "filepath", "file", "样本文件"},
+        }
+        for idx, key in enumerate(norm_header):
+            for target, aliases in alias_map.items():
+                if key in aliases and target not in col_map:
+                    col_map[target] = idx
+
+    def _cell(row: List[Any], index: int, default: str = "") -> str:
+        if index < 0 or index >= len(row):
+            return default
+        return str(row[index] or "").strip()
+
+    inserted = 0
+    now = _utc_now_iso()
+    created_by = (session.get("username") or "").strip() or "unknown"
+    with _db_connect() as conn:
+        for row in data_rows:
+            normalized_row = [str(c or "").strip() for c in row]
+            payload = {
+                "faultName": _cell(normalized_row, col_map.get("fault_name", 0)),
+                "confidence": _cell(normalized_row, col_map.get("confidence", 1), "0"),
+                "mechanism": _cell(normalized_row, col_map.get("mechanism", 2)),
+                "suggestions": _cell(normalized_row, col_map.get("suggestions", 3)),
+                "consequence": _cell(normalized_row, col_map.get("consequence", 4)),
+                "sourceDataset": _cell(normalized_row, col_map.get("source_dataset", 5)),
+                "sourceModel": _cell(normalized_row, col_map.get("source_model", 6)),
+                "sourceFile": _cell(normalized_row, col_map.get("source_file", 7)),
+            }
+            try:
+                normalized = normalize_decision_create_payload(payload)
+            except ValueError:
+                continue
+            quick = build_quick_maintenance_artifacts(
+                normalized["source_dataset"],
+                normalized["fault_name"],
+                normalized["confidence"],
+                normalized["source_file"],
+                normalized["source_model"] or "CNN-LSTM",
+            )
+            conn.execute(
+                """
+                INSERT INTO intelligent_decision_records (
+                    fault_name, fault_category, mechanism, suggestions, consequence,
+                    confidence, risk_level, source, source_dataset, source_model, source_file,
+                    rul_hours, status_risk, trend_svg, fft_svg, report_markdown,
+                    created_by, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    normalized["fault_name"],
+                    normalized["fault_category"],
+                    normalized["mechanism"],
+                    normalized["suggestions"],
+                    normalized["consequence"],
+                    normalized["confidence"],
+                    normalized["risk_level"],
+                    "import",
+                    normalized["source_dataset"],
+                    normalized["source_model"],
+                    normalized["source_file"],
+                    quick["rul_hours"],
+                    quick["status_risk"],
+                    quick["trend_svg"],
+                    quick["fft_svg"],
+                    quick["report_md"],
+                    created_by,
+                    now,
+                    now,
+                ),
+            )
+            inserted += 1
+        conn.commit()
+
+    if inserted == 0:
+        return jsonify({"error": "导入失败：所选行缺少必要字段。"}), 400
+    return jsonify({"ok": True, "imported": inserted})
+
+
 @app.post("/api/intelligent-decisions/generate")
 def intelligent_decision_generate():
     payload = request.get_json(silent=True) or {}
@@ -2790,6 +3127,21 @@ def intelligent_decision_from_diagnosis():
         except Exception:
             pass
 
+    if not report_md:
+        quick = build_quick_maintenance_artifacts(
+            dataset=dataset,
+            prediction=prediction,
+            confidence=built.get("confidence", confidence),
+            sample_file=file_path,
+            model_name=model or "CNN-LSTM",
+        )
+        report_obj = quick["report"]
+        rul_hours = float(quick["rul_hours"] or 0.0)
+        status_risk = str(quick["status_risk"] or built.get("risk_level", ""))
+        trend_svg = str(quick["trend_svg"] or "")
+        fft_svg = str(quick["fft_svg"] or "")
+        report_md = str(quick["report_md"] or "")
+
     now = _utc_now_iso()
     created_by = (session.get("username") or "").strip() or "unknown"
     with _db_connect() as conn:
@@ -2836,6 +3188,40 @@ def intelligent_decision_detail(record_id: int):
     row = _query_decision_row(record_id)
     if not row:
         return jsonify({"error": "记录不存在或无权限访问。"}), 404
+    try:
+        missing_report = not str(row["report_markdown"] or "").strip()
+        missing_trend = not str(row["trend_svg"] or "").strip()
+        missing_fft = not str(row["fft_svg"] or "").strip()
+        low_rul = float(row["rul_hours"] or 0.0) <= 0.0
+        if missing_report or missing_trend or missing_fft or low_rul:
+            quick = build_quick_maintenance_artifacts(
+                dataset=str(row["source_dataset"] or ""),
+                prediction=str(row["fault_name"] or ""),
+                confidence=float(row["confidence"] or 0.0),
+                sample_file=str(row["source_file"] or ""),
+                model_name=str(row["source_model"] or "CNN-LSTM"),
+            )
+            with _db_connect() as conn:
+                conn.execute(
+                    """
+                    UPDATE intelligent_decision_records
+                    SET rul_hours = ?, status_risk = ?, trend_svg = ?, fft_svg = ?, report_markdown = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        float(quick["rul_hours"] or 0.0),
+                        str(quick["status_risk"] or row["status_risk"] or ""),
+                        str(quick["trend_svg"] or ""),
+                        str(quick["fft_svg"] or ""),
+                        str(quick["report_md"] or row["report_markdown"] or ""),
+                        _utc_now_iso(),
+                        record_id,
+                    ),
+                )
+                conn.commit()
+            row = _query_decision_row(record_id) or row
+    except Exception:
+        pass
     return jsonify({"record": _decision_row_to_dict(row)})
 
 
@@ -2933,77 +3319,46 @@ def intelligent_decision_export_maintenance_report(record_id: int):
     row = _query_decision_row(record_id)
     if not row:
         return jsonify({"error": "记录不存在或无权限访问。"}), 404
+
     report_md = str(row["report_markdown"] or "").strip()
-    if not report_md:
-        # 先尝试按记录信息实时补算一次 RUL/报告；失败时再降级为兜底文本。
+    trend_svg = str(row["trend_svg"] or "").strip()
+    fft_svg = str(row["fft_svg"] or "").strip()
+    low_rul = float(row["rul_hours"] or 0.0) <= 0.0
+
+    if (not report_md) or (not trend_svg) or (not fft_svg) or low_rul:
         try:
-            ds = str(row["source_dataset"] or "").strip().upper()
-            file_path = str(row["source_file"] or "").strip()
-            if ds in {"CWRU", "MFPT"} and file_path and np is not None:
-                root = DIAG_DATASET_ROOTS.get(ds)
-                if root:
-                    root_resolved = root.resolve()
-                    target = (root_resolved / file_path).resolve()
-                    if str(target).startswith(str(root_resolved)) and target.exists() and target.is_file():
-                        raw_signal = diag_load_signal_from_mat(target)
-                        normalized = diag_normalize_signal(raw_signal)
-                        signal = [float(v) for v in normalized[:512]]
-                        fft = [float(v) for v in np.abs(np.fft.rfft(normalized))[:256]]
-                        report_obj = build_cnn_lstm_trend_and_rul(
-                            ds,
-                            signal,
-                            str(row["fault_name"] or ""),
-                            float(row["confidence"] or 0.0),
-                        )
-                        report_md = build_maintenance_report_text(report_obj, "数控机床主轴轴承", file_path)
-                        rul_hours = float(report_obj.get("rulHours", 0.0) or 0.0)
-                        status_risk = f"{report_obj.get('statusEvaluation', '')} 风险等级：{report_obj.get('riskLevel', '-')}".strip()
-                        trend_svg = _build_simple_svg_line(
-                            [float(v) for v in report_obj.get("healthSeries", [])],
-                            color="#2f6fed",
-                            x_label="时间窗口 (step)",
-                            y_label="健康度",
-                            y_unit="%",
-                        )
-                        fft_svg = _build_simple_svg_line(
-                            [float(v) for v in fft],
-                            color="#d64f4f",
-                            x_label="频率点 (bin)",
-                            y_label="振动幅值",
-                            y_unit="a.u.",
-                        )
-                        with _db_connect() as conn:
-                            conn.execute(
-                                """
-                                UPDATE intelligent_decision_records
-                                SET rul_hours = ?, status_risk = ?, trend_svg = ?, fft_svg = ?, report_markdown = ?, updated_at = ?
-                                WHERE id = ?
-                                """,
-                                (rul_hours, status_risk, trend_svg, fft_svg, report_md, _utc_now_iso(), record_id),
-                            )
-                            conn.commit()
+            quick = build_quick_maintenance_artifacts(
+                dataset=str(row["source_dataset"] or ""),
+                prediction=str(row["fault_name"] or ""),
+                confidence=float(row["confidence"] or 0.0),
+                sample_file=str(row["source_file"] or ""),
+                model_name=str(row["source_model"] or "CNN-LSTM"),
+            )
+            report_md = str(quick["report_md"] or report_md)
+            with _db_connect() as conn:
+                conn.execute(
+                    """
+                    UPDATE intelligent_decision_records
+                    SET rul_hours = ?, status_risk = ?, trend_svg = ?, fft_svg = ?, report_markdown = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        float(quick["rul_hours"] or row["rul_hours"] or 0.0),
+                        str(quick["status_risk"] or row["status_risk"] or ""),
+                        str(quick["trend_svg"] or trend_svg),
+                        str(quick["fft_svg"] or fft_svg),
+                        report_md or str(row["report_markdown"] or ""),
+                        _utc_now_iso(),
+                        record_id,
+                    ),
+                )
+                conn.commit()
         except Exception:
             pass
 
     if not report_md:
-        report_md = (
-            "# 数控机床故障综合维护报告\n\n"
-            "## 1. 记录信息\n"
-            f"- 故障名称：{row['fault_name'] or '-'}\n"
-            f"- 诊断置信度：{round(float(row['confidence'] or 0.0), 2)}%\n"
-            f"- 风险等级：{row['risk_level'] or '-'}\n"
-            f"- RUL：{round(float(row['rul_hours'] or 0.0), 2)} 小时\n"
-            f"- 状态评估与风险等级：{row['status_risk'] or '-'}\n"
-            f"- 数据集：{row['source_dataset'] or '-'}\n"
-            f"- 模型：{row['source_model'] or '-'}\n"
-            f"- 样本文件：{row['source_file'] or '-'}\n\n"
-            "## 2. 机理\n"
-            f"{row['mechanism'] or '-'}\n\n"
-            "## 3. 维护建议\n"
-            f"{row['suggestions'] or '-'}\n\n"
-            "## 4. 不维修可能后果\n"
-            f"{row['consequence'] or '-'}\n"
-        )
+        report_md = "# 数控机床故障综合维护报告\\n\\n暂无可导出的报告内容。"
+
     filename = f"综合维护报告_{record_id}.md"
     resp = Response(report_md, mimetype="text/markdown; charset=utf-8")
     resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{requests.utils.quote(filename)}"
@@ -3576,3 +3931,4 @@ def chat():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port, debug=False)
+
