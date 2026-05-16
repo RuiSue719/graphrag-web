@@ -1503,7 +1503,8 @@ def normalize_decision_update_payload(payload: Dict[str, Any], old_row: sqlite3.
         f"- 状态评估与风险等级：{status_risk or '-'}\n"
         f"- 数据集：{source_dataset or '-'}\n"
         f"- 模型：{source_model or '-'}\n"
-        f"- 样本文件：{source_file or '-'}\n\n"
+        f"- 样本文件：{source_file or '-'}\n"
+        "- RUL预测方法：系统优先采用 CNN-LSTM 滑窗趋势建模并外推；当缺少完整时序信号时使用快速估计。\n\n"
         "## 2. 机理\n"
         f"{mechanism}\n\n"
         "## 3. 维护建议\n"
@@ -2166,6 +2167,7 @@ def build_maintenance_report_text(report: Dict[str, Any], equipment_name: str, s
         f"- 健康状态评估：{report.get('statusEvaluation', '-')}\n"
         f"- 风险等级：{report.get('riskLevel', '-')}\n\n"
         "## 3. 剩余寿命预测（RUL）\n"
+        "- RUL预测方法：系统优先采用 CNN-LSTM 滑窗趋势建模并外推；当缺少完整时序信号时使用快速估计。\n"
         f"- 预测剩余使用寿命：{report.get('rulHours', 0)} 小时\n\n"
         "## 4. 维护建议\n"
         f"{report.get('maintenanceAdvice', '-')}\n"
@@ -2224,6 +2226,8 @@ def build_maintenance_report_html(
     <h2>状态评估与风险等级</h2>
     <p>{report.get('statusEvaluation', '-')}</p>
     <p><span class="risk">{report.get('riskLevel', '-')}</span></p>
+    <h2>剩余寿命预测说明</h2>
+    <p>RUL 预测方法：系统优先采用 CNN-LSTM 滑窗趋势建模并外推；当缺少完整时序信号时使用快速估计。</p>
     <h2>健康趋势曲线（CNN-LSTM）</h2>
     <div class="plot">{trend_svg}</div>
     <h2>振动频谱图</h2>
@@ -3451,6 +3455,7 @@ def intelligent_decision_export_maintenance_report(record_id: int):
       <div class="item">数据集：{html.escape(source_dataset)}</div>
       <div class="item">模型：{html.escape(source_model)}</div>
       <div class="item">样本文件：{html.escape(source_file)}</div>
+      <div class="item">RUL预测方法：系统优先采用 CNN-LSTM 滑窗趋势建模并外推</div>
     </div>
 
     <h2>机理</h2>

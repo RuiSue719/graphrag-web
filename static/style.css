@@ -1539,6 +1539,29 @@ body {
   margin-top: 12px;
 }
 
+#decisionEditModal .case-modal-card {
+  width: min(860px, 92vw);
+  max-height: 82vh;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding-right: 10px;
+}
+
+#decisionEditModal .case-modal-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+#decisionEditModal .case-modal-card::-webkit-scrollbar-track {
+  background: #eef3ff;
+  border-radius: 999px;
+}
+
+#decisionEditModal .case-modal-card::-webkit-scrollbar-thumb {
+  background: #9fb4e6;
+  border-radius: 999px;
+}
+
 .diag-hero {
   border: 1px solid var(--line);
   border-radius: 16px;
