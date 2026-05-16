@@ -1249,6 +1249,45 @@ body {
   min-height: 180px;
 }
 
+.decision-edit-form-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "fault confidence"
+    "risk rul"
+    "status status"
+    "dataset model"
+    "file file"
+    "mechanism suggestions"
+    "consequence consequence";
+  gap: 12px;
+}
+
+.decision-edit-form-grid .decision-fault { grid-area: fault !important; }
+.decision-edit-form-grid .decision-confidence { grid-area: confidence !important; }
+.decision-edit-form-grid .decision-risk { grid-area: risk !important; }
+.decision-edit-form-grid .decision-rul { grid-area: rul !important; }
+.decision-edit-form-grid .decision-status { grid-area: status !important; }
+.decision-edit-form-grid .decision-dataset { grid-area: dataset !important; }
+.decision-edit-form-grid .decision-model { grid-area: model !important; }
+.decision-edit-form-grid .decision-file { grid-area: file !important; }
+.decision-edit-form-grid .decision-mechanism { grid-area: mechanism !important; }
+.decision-edit-form-grid .decision-suggestions { grid-area: suggestions !important; }
+.decision-edit-form-grid .decision-consequence { grid-area: consequence !important; }
+
+.decision-edit-form-grid .decision-status textarea {
+  min-height: 82px !important;
+  line-height: 1.5;
+}
+
+.decision-edit-form-grid .decision-mechanism textarea,
+.decision-edit-form-grid .decision-suggestions textarea {
+  min-height: 140px !important;
+}
+
+.decision-edit-form-grid .decision-consequence textarea {
+  min-height: 130px !important;
+}
+
 /* 添加记录弹窗使用独立网格，避免复用详情网格区域导致字段重叠 */
 #decisionCreateModal .decision-create-form-grid {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -1287,6 +1326,10 @@ body {
 
 @media (max-width: 980px) {
   #decisionCreateModal .decision-create-form-grid {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: none !important;
+  }
+  .decision-edit-form-grid {
     grid-template-columns: 1fr !important;
     grid-template-areas: none !important;
   }
@@ -2465,38 +2508,59 @@ button:hover,
 }
 
 /* 覆盖全局 button 的 !important，恢复诊断按钮选中态（图二风格） */
-.diag-card {
-  background: #f4f8ff !important;
-  border-color: #d3dff7 !important;
-  color: #3a5685 !important;
+.side-nav-item.active {
+  background: #3f77e6 !important;
+  border-color: #3f77e6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(63, 119, 230, 0.24) !important;
 }
 
+.side-nav-item.active:hover {
+  background: #376edb !important;
+  border-color: #376edb !important;
+  color: #ffffff !important;
+}
+
+.diag-hero,
+.diag-panel,
+.diag-result-card,
+.diag-report-block,
+.diag-model-tip,
+.diag-select,
+.diag-meta {
+  background: #ffffff !important;
+}
+
+.diag-card,
 .diag-seg {
-  background: #f4f8ff !important;
-  border-color: #d3def5 !important;
+  background: #ffffff !important;
+  border-color: #d5dfef !important;
   color: #3b5684 !important;
 }
 
 .diag-card.active,
 .diag-card[data-active="true"],
-.diag-card[aria-pressed="true"] {
-  border-color: #8ea9e8 !important;
-  background: linear-gradient(180deg, #e6eeff, #d9e7ff) !important;
-  color: #2f4673 !important;
-}
-
+.diag-card[aria-pressed="true"],
 .diag-seg.active,
 .diag-seg[data-active="true"],
 .diag-seg[aria-pressed="true"] {
-  border-color: #8ea9e8 !important;
-  background: linear-gradient(180deg, #e6eeff, #d9e7ff) !important;
+  border-color: #9ab3ea !important;
+  background: #eef4ff !important;
   color: #2f4673 !important;
+  box-shadow: 0 0 0 2px rgba(116, 151, 227, 0.22) !important;
 }
 
 .diag-card.active .diag-card-desc,
 .diag-card[data-active="true"] .diag-card-desc,
 .diag-card[aria-pressed="true"] .diag-card-desc {
   color: #5b74a0 !important;
+}
+
+.diag-run-btn.ready {
+  background: #eef4ff !important;
+  border-color: #9ab3ea !important;
+  color: #2f4673 !important;
+  box-shadow: 0 0 0 2px rgba(116, 151, 227, 0.2) !important;
 }
 
 /* 删除按钮强红色风格 */

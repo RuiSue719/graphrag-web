@@ -148,6 +148,11 @@ const decisionFaultNameInput = document.getElementById("decisionFaultNameInput")
 const decisionConfidenceEditInput = document.getElementById("decisionConfidenceEditInput");
 const decisionMechanismInput = document.getElementById("decisionMechanismInput");
 const decisionRiskLevelInput = document.getElementById("decisionRiskLevelInput");
+const decisionRulInput = document.getElementById("decisionRulInput");
+const decisionStatusRiskInput = document.getElementById("decisionStatusRiskInput");
+const decisionSourceDatasetInput = document.getElementById("decisionSourceDatasetInput");
+const decisionSourceModelInput = document.getElementById("decisionSourceModelInput");
+const decisionSourceFileInput = document.getElementById("decisionSourceFileInput");
 const decisionSuggestionsInput = document.getElementById("decisionSuggestionsInput");
 const decisionConsequenceInput = document.getElementById("decisionConsequenceInput");
 const decisionModalSaveBtn = document.getElementById("decisionModalSaveBtn");
@@ -1177,15 +1182,26 @@ function setDecisionModalEditable(editable) {
   if (decisionEditFormGrid) {
     decisionEditFormGrid.style.display = editable ? "grid" : "none";
   }
-  [decisionFaultNameInput, decisionConfidenceEditInput, decisionMechanismInput, decisionSuggestionsInput, decisionConsequenceInput].forEach((el) => {
+  if (decisionReportDetail) {
+    decisionReportDetail.style.display = editable ? "none" : "block";
+  }
+  [
+    decisionFaultNameInput,
+    decisionConfidenceEditInput,
+    decisionRiskLevelInput,
+    decisionRulInput,
+    decisionStatusRiskInput,
+    decisionSourceDatasetInput,
+    decisionSourceModelInput,
+    decisionSourceFileInput,
+    decisionMechanismInput,
+    decisionSuggestionsInput,
+    decisionConsequenceInput,
+  ].forEach((el) => {
     if (!el) return;
     el.readOnly = !editable;
     if (el.type === "number") el.disabled = !editable;
   });
-  if (decisionRiskLevelInput) {
-    decisionRiskLevelInput.readOnly = true;
-    decisionRiskLevelInput.disabled = false;
-  }
   if (decisionModalSaveBtn) decisionModalSaveBtn.style.display = editable ? "inline-flex" : "none";
 }
 
@@ -1252,6 +1268,11 @@ async function openDecisionModal(mode, recordId) {
     if (decisionConfidenceEditInput) decisionConfidenceEditInput.value = String(row.confidence ?? 0);
     if (decisionMechanismInput) decisionMechanismInput.value = String(decisionField(row, "mechanismText", "机理") || "");
     if (decisionRiskLevelInput) decisionRiskLevelInput.value = String(row.riskLevel || riskByConfidence(row.confidence));
+    if (decisionRulInput) decisionRulInput.value = String(row.RUL ?? 0);
+    if (decisionStatusRiskInput) decisionStatusRiskInput.value = String(decisionField(row, "statusRisk", "状态评估与风险等级") || "");
+    if (decisionSourceDatasetInput) decisionSourceDatasetInput.value = String(row.sourceDataset || "");
+    if (decisionSourceModelInput) decisionSourceModelInput.value = String(row.sourceModel || "");
+    if (decisionSourceFileInput) decisionSourceFileInput.value = String(row.sourceFile || "");
     if (decisionSuggestionsInput) decisionSuggestionsInput.value = String(decisionField(row, "suggestionsText", "建议") || "");
     if (decisionConsequenceInput) decisionConsequenceInput.value = String(decisionField(row, "consequenceText", "不维修可能后果") || "");
 
@@ -1299,9 +1320,15 @@ async function saveDecisionModal() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         faultName: (decisionFaultNameInput?.value || "").trim(),
+        riskLevel: (decisionRiskLevelInput?.value || "").trim(),
         mechanism: (decisionMechanismInput?.value || "").trim(),
         suggestions: (decisionSuggestionsInput?.value || "").trim(),
         consequence: (decisionConsequenceInput?.value || "").trim(),
+        rulHours: Number(decisionRulInput?.value || 0),
+        statusRisk: (decisionStatusRiskInput?.value || "").trim(),
+        sourceDataset: (decisionSourceDatasetInput?.value || "").trim(),
+        sourceModel: (decisionSourceModelInput?.value || "").trim(),
+        sourceFile: (decisionSourceFileInput?.value || "").trim(),
         confidence: Number.isFinite(confidence) ? confidence : 0,
       }),
     });
@@ -2942,7 +2969,9 @@ decisionModalCloseBtn?.addEventListener("click", closeDecisionModal);
 decisionModalSaveBtn?.addEventListener("click", saveDecisionModal);
 decisionConfidenceEditInput?.addEventListener("input", () => {
   if (!decisionRiskLevelInput) return;
-  decisionRiskLevelInput.value = riskByConfidence(decisionConfidenceEditInput?.value);
+  if (!(decisionRiskLevelInput.value || "").trim()) {
+    decisionRiskLevelInput.value = riskByConfidence(decisionConfidenceEditInput?.value);
+  }
 });
 diagSaveDecisionBtn?.addEventListener("click", saveDiagToDecision);
 

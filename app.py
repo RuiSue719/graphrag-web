@@ -1483,6 +1483,34 @@ def normalize_decision_update_payload(payload: Dict[str, Any], old_row: sqlite3.
     if not fault_name or not mechanism or not suggestions or not consequence:
         raise ValueError("请完整填写“故障名称、机理、建议、不维修可能后果”。")
     category = resolve_fault_category(fault_name) or str(old_row["fault_category"] or "").strip() or "未知"
+    risk_level = str(payload.get("riskLevel", old_row["risk_level"]) or "").strip() or risk_level_from_confidence(confidence_percent)
+    try:
+        rul_hours = float(payload.get("rulHours", old_row["rul_hours"]))
+    except Exception:
+        rul_hours = float(old_row["rul_hours"] or 0.0)
+    rul_hours = max(0.0, round(rul_hours, 2))
+    status_risk = str(payload.get("statusRisk", old_row["status_risk"]) or "").strip()
+    source_dataset = str(payload.get("sourceDataset", old_row["source_dataset"]) or "").strip()
+    source_model = str(payload.get("sourceModel", old_row["source_model"]) or "").strip()
+    source_file = str(payload.get("sourceFile", old_row["source_file"]) or "").strip()
+    report_md = (
+        "# 数控机床故障综合维护报告\n\n"
+        "## 1. 记录信息\n"
+        f"- 故障名称：{fault_name}\n"
+        f"- 诊断置信度：{round(confidence_percent, 2)}%\n"
+        f"- 风险等级：{risk_level}\n"
+        f"- RUL：{rul_hours} 小时\n"
+        f"- 状态评估与风险等级：{status_risk or '-'}\n"
+        f"- 数据集：{source_dataset or '-'}\n"
+        f"- 模型：{source_model or '-'}\n"
+        f"- 样本文件：{source_file or '-'}\n\n"
+        "## 2. 机理\n"
+        f"{mechanism}\n\n"
+        "## 3. 维护建议\n"
+        f"{suggestions}\n\n"
+        "## 4. 不维修可能后果\n"
+        f"{consequence}\n"
+    )
     return {
         "fault_name": fault_name,
         "fault_category": category,
@@ -1490,7 +1518,13 @@ def normalize_decision_update_payload(payload: Dict[str, Any], old_row: sqlite3.
         "suggestions": suggestions,
         "consequence": consequence,
         "confidence": confidence_percent,
-        "risk_level": risk_level_from_confidence(confidence_percent),
+        "risk_level": risk_level,
+        "rul_hours": rul_hours,
+        "status_risk": status_risk,
+        "source_dataset": source_dataset,
+        "source_model": source_model,
+        "source_file": source_file,
+        "report_markdown": report_md,
     }
 
 
@@ -3250,7 +3284,8 @@ def intelligent_decision_update(record_id: int):
             """
             UPDATE intelligent_decision_records
             SET fault_name = ?, fault_category = ?, mechanism = ?, suggestions = ?, consequence = ?,
-                confidence = ?, risk_level = ?, updated_at = ?
+                confidence = ?, risk_level = ?, source_dataset = ?, source_model = ?, source_file = ?,
+                rul_hours = ?, status_risk = ?, report_markdown = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -3261,6 +3296,12 @@ def intelligent_decision_update(record_id: int):
                 normalized["consequence"],
                 normalized["confidence"],
                 normalized["risk_level"],
+                normalized["source_dataset"],
+                normalized["source_model"],
+                normalized["source_file"],
+                normalized["rul_hours"],
+                normalized["status_risk"],
+                normalized["report_markdown"],
                 _utc_now_iso(),
                 record_id,
             ),
